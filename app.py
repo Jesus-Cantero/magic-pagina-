@@ -1818,4 +1818,7 @@ def error_interno(_error):
 
 if __name__ == "__main__":
     # Modo debug solo si se pide explícitamente con FLASK_DEBUG=1
-    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
+    port = int(os.environ.get("PORT", 5000))
+    host = "0.0.0.0" if "PORT" in os.environ else "127.0.0.1"
+    app.run(host=host, port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
+application = app
