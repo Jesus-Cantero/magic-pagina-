@@ -36,7 +36,6 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # La clave secreta ya NO está escrita en el código: se lee de una variable de entorno.
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-db.init_db()
 
 POR_PAGINA = 24
 
