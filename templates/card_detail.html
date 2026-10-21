@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}{{ carta['nombre'] }} · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="barra-superior-detalle">
+    <a href="{{ request.referrer if request.referrer and '/carta/' not in request.referrer else url_for('index') }}" class="btn btn-secundario btn-sm">
+        &larr; Volver a resultados
+    </a>
+</div>
+
+<div class="ficha-carta">
+    <div class="ficha-imagen">
+        {% if carta['imagen_url'] %}
+            <img src="{{ carta['imagen_url'] }}" alt="{{ carta['nombre'] }}" id="img-ficha-principal">
+        {% else %}
+            <div class="sin-imagen" id="img-ficha-principal">Sin imagen</div>
+        {% endif %}
+        <div class="ficha-imagen-pie">
+            <span class="badge-hd-tag" id="etiqueta-arte-activo">✨ Calidad HD (672×936)</span>
+        </div>
+    </div>
+
+    <div class="ficha-info">
+        <div class="ficha-cabecera">
+            <h1 class="ficha-titulo">{{ carta['nombre'] }}</h1>
+            {% if carta['coste_mana'] %}
+                <div class="ficha-coste">{{ carta['coste_mana'] | simbolos_mana }}</div>
+            {% endif %}
+        </div>
+
+        <div class="ficha-etiquetas">
+            {% if carta['es_spoiler'] %}
+                <span class="chip chip-ilegal">🔥 Spoiler / Próximo lanzamiento</span>
+            {% endif %}
+            <span class="chip chip-tipo">{{ carta['tipo'] }}</span>
+            {% if carta['set_nombre'] %}
+                <span class="chip chip-set" id="chip-set-activo">
+                    {% if carta['set_code'] %}<strong>{{ carta['set_code'] | upper }}</strong> · {% endif %}{{ carta['set_nombre'] }}
+                </span>
+            {% endif %}
+            {% if carta['rareza'] %}
+                <span class="chip chip-rareza rareza-{{ carta['rareza'] }}">{{ carta['rareza'] | capitalize }}</span>
+            {% endif %}
+            {% if carta['poder'] or carta['resistencia'] %}
+                <span class="chip chip-pt">⚔ {{ carta['poder'] }} / {{ carta['resistencia'] }}</span>
+            {% endif %}
+        </div>
+
+        <div class="texto-carta">{{ (carta['texto'] | simbolos_mana) if carta['texto'] else 'Sin texto de reglas.' }}</div>
+
+        <div class="panel-seccion panel-anadir">
+            <h3>Añadir a un mazo (con el arte o alter seleccionado)</h3>
+            {% if mazos %}
+            <form class="form-anadir-mazo" id="form-anadir">
+                <input type="hidden" id="input-imagen-elegida" value="{{ carta['imagen_url'] or '' }}">
+                <select id="select-mazo" aria-label="Mazo">
+                    {% for m in mazos %}
+                        <option value="{{ m['id'] }}">{{ m['nombre'] }} ({{ m['total_cartas'] }})</option>
+                    {% endfor %}
+                </select>
+                <input type="number" id="input-cantidad" value="1" min="1" max="99" aria-label="Cantidad">
+                <button type="submit">+ Añadir con este arte</button>
+                <button type="button" class="btn-secundario" id="btn-hacer-comandante">👑 Comandante con este arte</button>
+            </form>
+            <p id="mensaje-anadir" role="status"></p>
+            {% else %}
+                <p class="texto-suave">Todavía no tienes mazos creados. <a href="{{ url_for('listar_mazos') }}">Crear mi primer mazo &rarr;</a></p>
+            {% endif %}
+        </div>
+
+        <!-- Galería interactiva de Alters Oficiales HD (Secret Lair, Borderless, Showcase, Extended Art, Promos) -->
+        <div class="panel-seccion">
+            <div class="alters-seccion-header">
+                <h3>🎨 Alters Oficiales y Ediciones en Alta Calidad (HD)</h3>
+                <span class="texto-suave" id="contador-alters-ficha">Cargando versiones de Scryfall...</span>
+            </div>
+            <p class="texto-suave" style="margin-top:0; margin-bottom:0.75rem; font-size:0.84rem;">
+                Haz clic en cualquier alter oficial para cambiar la imagen de la carta y usar esa versión al añadirla a tu mazo:
+            </p>
+            <div id="galeria-alters-ficha" class="galeria-alters-ficha"></div>
+        </div>
+
+        <div class="panel-seccion">
+            <h3>Legalidad por formato</h3>
+            <ul class="legalidades">
+                {% for l in legalidades %}
+                    <li class="legalidad-{{ l.estado }}">
+                        <span class="formato-nombre">{{ l.formato }}</span>
+                        <span class="formato-estado">{{ l.texto }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const CARTA_ID = {{ carta['id'] | tojson }};
+    const imgPrincipal = document.getElementById('img-ficha-principal');
+    const inputImgElegida = document.getElementById('input-imagen-elegida');
+    const etiquetaArte = document.getElementById('etiqueta-arte-activo');
+    const chipSet = document.getElementById('chip-set-activo');
+    const galeria = document.getElementById('galeria-alters-ficha');
+    const contadorAlters = document.getElementById('contador-alters-ficha');
+
+    // Cargar todos los alters oficiales en HD desde Scryfall
+    async function cargarAltersFicha() {
+        try {
+            const resp = await fetch(`/api/cartas/${encodeURIComponent(CARTA_ID)}/alters`);
+            const data = await resp.json();
+            galeria.replaceChildren();
+            if (!data.ok || !data.alters || data.alters.length === 0) {
+                contadorAlters.textContent = '1 versión oficial';
+                return;
+            }
+            contadorAlters.textContent = `${data.alters.length} versión(es) / alters HD disponibles`;
+
+            data.alters.forEach((alt) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'alter-thumb-btn' + (alt.imagen_url === (imgPrincipal ? imgPrincipal.src : '') ? ' active' : '');
+
+                const badge = document.createElement('span');
+                badge.className = 'alter-thumb-badge' + (alt.es_alter_especial ? ' especial' : '');
+                badge.textContent = alt.etiqueta;
+
+                const img = document.createElement('img');
+                img.src = alt.imagen_url;
+                img.alt = `${alt.set_nombre} #${alt.collector_number}`;
+                img.loading = 'lazy';
+
+                const info = document.createElement('span');
+                info.className = 'alter-thumb-info';
+                info.textContent = `${alt.set_code} #${alt.collector_number} (${alt.fecha || ''}) · ${alt.artista}`;
+
+                item.appendChild(badge);
+                item.appendChild(img);
+                item.appendChild(info);
+
+                item.addEventListener('click', async () => {
+                    document.querySelectorAll('.alter-thumb-btn').forEach(b => b.classList.remove('active'));
+                    item.classList.add('active');
+                    if (imgPrincipal && imgPrincipal.tagName === 'IMG') {
+                        imgPrincipal.src = alt.imagen_url;
+                    }
+                    if (inputImgElegida) {
+                        inputImgElegida.value = alt.imagen_url;
+                    }
+                    if (etiquetaArte) {
+                        etiquetaArte.textContent = `${alt.etiqueta} · ${alt.set_code} #${alt.collector_number}`;
+                    }
+                    if (chipSet) {
+                        chipSet.textContent = `${alt.set_code} · ${alt.set_nombre}`;
+                    }
+                    // Guardar también como imagen por defecto de la carta en el catálogo
+                    try {
+                        await enviarJSON(`/api/cartas/${encodeURIComponent(CARTA_ID)}/imagen`, {
+                            imagen_url: alt.imagen_url,
+                        });
+                    } catch (_) {}
+                });
+
+                galeria.appendChild(item);
+            });
+        } catch (_) {
+            contadorAlters.textContent = '';
+        }
+    }
+
+    cargarAltersFicha();
+
+    const formAnadir = document.getElementById('form-anadir');
+    if (formAnadir) {
+        formAnadir.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const select = document.getElementById('select-mazo');
+            const mazoId = select.value;
+            const cantidad = parseInt(document.getElementById('input-cantidad').value, 10) || 1;
+            const imagenUrl = inputImgElegida ? inputImgElegida.value : '';
+            const mensaje = document.getElementById('mensaje-anadir');
+            const nombreMazo = select.options[select.selectedIndex].text.replace(/\s\(\d+\)$/, '');
+
+            try {
+                const data = await enviarJSON(`/api/mazos/${mazoId}/anadir`, {
+                    carta_id: CARTA_ID,
+                    cantidad,
+                    imagen_url: imagenUrl,
+                });
+                mensaje.className = 'mensaje-ok';
+                mensaje.textContent = `Añadida con el arte elegido ✔ — ahora tienes ${data.cantidad} copia(s) en «${nombreMazo}» (${data.total} en biblioteca).`;
+                select.options[select.selectedIndex].text = `${nombreMazo} (${data.total})`;
+            } catch (error) {
+                mensaje.className = 'mensaje-error';
+                mensaje.textContent = `Error al añadir: ${error.message}`;
+            }
+        });
+    }
+
+    const btnCmd = document.getElementById('btn-hacer-comandante');
+    if (btnCmd) {
+        btnCmd.addEventListener('click', async () => {
+            const select = document.getElementById('select-mazo');
+            const mazoId = select.value;
+            const imagenUrl = inputImgElegida ? inputImgElegida.value : '';
+            const mensaje = document.getElementById('mensaje-anadir');
+            const nombreMazo = select.options[select.selectedIndex].text.replace(/\s\(\d+\)$/, '');
+
+            try {
+                await enviarJSON(`/api/mazos/${mazoId}/comandante`, {
+                    carta_id: CARTA_ID,
+                    imagen_url: imagenUrl,
+                });
+                mensaje.className = 'mensaje-ok';
+                mensaje.textContent = `👑 Asignada como Comandante con el arte elegido en «${nombreMazo}» ✔`;
+            } catch (error) {
+                mensaje.className = 'mensaje-error';
+                mensaje.textContent = `Error al asignar comandante: ${error.message}`;
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

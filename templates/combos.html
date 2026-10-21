@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}∞ Combos & Mapa de Rutas · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Atlas de Combos · Inspirado en LoopLine & Commander Spellbook</span>
+        <h1>∞ Analizador de Combos y Mapa de Rutas</h1>
+    </div>
+    <div class="resultados-info" id="resumen-analisis">
+        <span>Selecciona uno de tus mazos o pega una lista para descubrir sus combos y sugerencias a 1 carta.</span>
+    </div>
+</div>
+
+<!-- Panel de entrada de mazo -->
+<div class="combos-controles">
+    <div class="combos-selector-mazo">
+        <div class="campo-filtro campo-principal">
+            <label for="select-mazo-combo">01 · Selecciona uno de tus mazos</label>
+            <select id="select-mazo-combo">
+                {% if mazos %}
+                    {% for m in mazos %}
+                        <option value="{{ m['id'] }}" {% if m['id'] == mazo_seleccionado %}selected{% endif %}>
+                            {{ m['nombre'] }} ({{ m['total_cartas'] }} cartas · {{ m['formato'] or 'Casual' }})
+                        </option>
+                    {% endfor %}
+                {% else %}
+                    <option value="">No tienes mazos creados todavía</option>
+                {% endif %}
+            </select>
+        </div>
+
+        <div class="acciones-busqueda">
+            <button type="button" id="btn-analizar-mazo">∞ Analizar mazo</button>
+            <button type="button" class="btn-secundario" id="btn-probar-ejemplo" title="Cargar una lista de ejemplo con combos clásicos para ver el mapa en acción">
+                ⚡ Probar ejemplo con combos
+            </button>
+        </div>
+    </div>
+
+    <details class="combos-pegar-lista" id="details-lista-texto">
+        <summary>📋 O pega una lista de cartas (formato Moxfield / MTG Arena)</summary>
+        <div class="combos-textarea-wrap">
+            <textarea id="textarea-lista-combo" rows="5" placeholder="1 Demonic Consultation&#10;1 Thassa's Oracle&#10;1 Sol Ring&#10;1 Isochron Scepter&#10;1 Dramatic Reversal"></textarea>
+            <div class="acciones-busqueda">
+                <button type="button" id="btn-analizar-texto">Analizar lista pegada</button>
+                <button type="button" class="btn-secundario btn-sm" id="btn-limpiar-texto">Limpiar</button>
+            </div>
+        </div>
+    </details>
+</div>
+
+<!-- Estado de carga / error -->
+<div id="combos-loading" class="combos-loading hidden">
+    <div class="spinner"></div>
+    <span>Consultando rutas en Commander Spellbook y generando el mapa de combos...</span>
+</div>
+<p id="combos-error" class="mensaje-error hidden" role="status"></p>
+
+<!-- Contenedor de resultados (oculto hasta analizar) -->
+<section id="combos-resultados" class="hidden">
+
+    <!-- Pestañas de modo: Mapa visual / Combos en el mazo / Sugerencias a 1 carta / Cómo funciona -->
+    <div class="combos-tabs" role="tablist">
+        <button type="button" class="combo-tab active" data-tab="tab-mapa">
+            <span>∞ Mapa de Rutas</span>
+        </button>
+        <button type="button" class="combo-tab" data-tab="tab-incluidos">
+            <span>✔ Combos en tu mazo</span>
+            <span class="nav-badge" id="badge-incluidos">0</span>
+        </button>
+        <button type="button" class="combo-tab" data-tab="tab-sugerencias">
+            <span>✦ Sugerencias (Falta 1 carta)</span>
+            <span class="nav-badge badge-amber" id="badge-sugerencias">0</span>
+        </button>
+        <button type="button" class="combo-tab" data-tab="tab-guia">
+            <span>？ Cómo funciona</span>
+        </button>
+    </div>
+
+    <!-- PESTAÑA 1: MAPA VISUAL INTERACTIVO (LOOPLINE ROUTE MAP) -->
+    <div id="tab-mapa" class="combo-tab-panel">
+        <div class="loopline-toolbar">
+            <div class="loopline-filtros-mapa">
+                <button type="button" class="btn-secundario btn-sm active" id="btn-mapa-ver-todos">Todos los nodos</button>
+                <button type="button" class="btn-secundario btn-sm" id="btn-mapa-ver-incluidos">Solo incluidos</button>
+                <button type="button" class="btn-secundario btn-sm" id="btn-mapa-ver-sugerencias">Solo sugerencias (1 carta)</button>
+            </div>
+            <div class="loopline-leyenda">
+                <span class="leyenda-item"><i class="dot dot-card"></i> Carta en mazo</span>
+                <span class="leyenda-item"><i class="dot dot-missing"></i> Carta sugerida (+1)</span>
+                <span class="leyenda-item"><i class="dot dot-combo"></i> Ruta de Combo</span>
+                <span class="leyenda-item"><i class="dot dot-outcome"></i> Resultado / Efecto</span>
+            </div>
+            <div class="loopline-zoom">
+                <button type="button" class="btn-secundario btn-sm" id="btn-zoom-in" title="Acercar">+</button>
+                <button type="button" class="btn-secundario btn-sm" id="btn-zoom-out" title="Alejar">−</button>
+                <button type="button" class="btn-secundario btn-sm" id="btn-zoom-reset" title="Centrar mapa">Centrar</button>
+            </div>
+        </div>
+
+        <div class="loopline-stage" id="loopline-stage">
+            <svg id="loopline-svg" class="loopline-svg" viewBox="0 0 1200 680" aria-label="Mapa interactivo de rutas de combos"></svg>
+            <div id="loopline-empty" class="estado-vacio hidden">
+                <h3>No hay rutas para mostrar en el mapa</h3>
+                <p>Añade más cartas al mazo o pulsa «⚡ Probar ejemplo con combos» para explorar el mapa interactivo.</p>
+            </div>
+        </div>
+
+        <!-- Panel inferior de detalle al hacer clic en un nodo del mapa -->
+        <div id="loopline-inspector" class="loopline-inspector hidden"></div>
+    </div>
+
+    <!-- PESTAÑA 2: COMBOS YA INCLUIDOS EN EL MAZO -->
+    <div id="tab-incluidos" class="combo-tab-panel hidden">
+        <div id="lista-combos-incluidos" class="combos-grid"></div>
+    </div>
+
+    <!-- PESTAÑA 3: SUGERENCIAS A 1 CARTA DE DISTANCIA -->
+    <div id="tab-sugerencias" class="combo-tab-panel hidden">
+        <div class="aviso-sugerencias">
+            <strong>Sugerencias a 1 carta:</strong> Estos combos ya tienen casi todas sus piezas en tu mazo y se activan añadiendo <strong>una única carta</strong>. Si la carta está en la base de datos local, puedes añadirla a tu mazo con un clic.
+        </div>
+        <div id="lista-combos-sugerencias" class="combos-grid"></div>
+    </div>
+
+    <!-- PESTAÑA 4: GUÍA DE USO (ESTILO LOOPLINE HOW-TO) -->
+    <div id="tab-guia" class="combo-tab-panel hidden">
+        <div class="howto-grid">
+            <article class="howto-card">
+                <span class="howto-num">01</span>
+                <h3>Introduce tu mazo</h3>
+                <p>Elige cualquiera de los mazos que has creado en tu cuenta de SusoMTG o pega una lista en formato Moxfield o MTG Arena.</p>
+            </article>
+            <article class="howto-card">
+                <span class="howto-num">02</span>
+                <h3>Analiza los combos</h3>
+                <p>Al pulsar «∞ Analizar mazo», cruzamos tus cartas con la base de datos de Commander Spellbook para detectar todas las líneas disponibles.</p>
+            </article>
+            <article class="howto-card">
+                <span class="howto-num">03</span>
+                <h3>Explora el Mapa de Rutas</h3>
+                <p>Haz clic en cualquier carta, nodo de combo o resultado para iluminar toda su ruta conectada. Arrastra el lienzo para desplazarte y usa los botones de zoom.</p>
+            </article>
+            <article class="howto-card">
+                <span class="howto-num">04</span>
+                <h3>Completa combos con 1 carta</h3>
+                <p>En «✦ Sugerencias» verás qué combos desbloqueas añadiendo solo 1 carta más, con un botón directo para incorporarla a tu mazo.</p>
+            </article>
+        </div>
+    </div>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/combos.js') }}"></script>
+{% endblock %}

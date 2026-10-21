@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error {{ codigo }} - Suso Demonic Consultation{% endblock %}
+
+{% block content %}
+<span class="eyebrow">Error {{ codigo }}</span>
+<h1>El hechizo ha fallado</h1>
+<div class="divisor"><span>✦</span></div>
+<p>{{ mensaje }}</p>
+<p><a href="{{ url_for('index') }}">&larr; Volver al grimorio</a></p>
+{% endblock %}

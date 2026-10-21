@@ -1,0 +1,26 @@
+# Base de datos local (se genera con `python download_cards.py`, ~40 MB)
+mtg_cards.db
+mtg_cards.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Variables de entorno / secretos
+.env
+
+# Archivos sueltos
+mtg-wiki.zip
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

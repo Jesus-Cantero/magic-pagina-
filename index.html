@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suso Demonic Consultation - Wiki de Magic the Gathering &amp; Creador de Mazos</title>
+
+    <!-- Meta tags de SEO -->
+    <meta name="description" content="Grimorio arcano de Magic the Gathering: busca cartas, explora ediciones y crea tus mazos personalizados.">
+    <meta name="keywords" content="Magic the Gathering, MTG, Wiki, Grimorio, Deck Builder, Scryfall, Demonic Consultation">
+    <meta name="author" content="Suso">
+
+    <!-- Estilos CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navegación Superior -->
+    <nav class="navbar" id="main-navbar">
+        <button type="button" class="logo" id="logo-btn" data-vista="grimorio">
+            Suso
+            <span class="sub">Demonic Consultation</span>
+        </button>
+        <div class="nav-links">
+            <button type="button" class="nav-btn active" id="nav-btn-grimorio" data-vista="grimorio">
+                <span>✦ Grimorio</span>
+            </button>
+            <button type="button" class="nav-btn" id="nav-btn-mazos" data-vista="mazos">
+                <span>⚔ Mis Mazos</span>
+                <span class="nav-badge" id="badge-total-mazos">0</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <main class="contenedor">
+
+        <!-- ================= SECCIÓN 1: GRIMORIO (BUSCADOR DE CARTAS) ================= -->
+        <section id="seccion-grimorio" class="seccion">
+            <span class="eyebrow">El compendio</span>
+            <h1>Consulta el grimorio completo</h1>
+            <div class="divisor"><span>✦</span></div>
+
+            <!-- Formulario de búsqueda -->
+            <form id="form-busqueda" class="form-busqueda">
+                <input type="text" id="input-q" placeholder="Nombre o texto de la carta (ej. Lotus, Counterspell)..." aria-label="Texto de búsqueda">
+
+                <select id="select-color" aria-label="Seleccionar color">
+                    <option value="">Cualquier color</option>
+                    <option value="W">Blanco (W)</option>
+                    <option value="U">Azul (U)</option>
+                    <option value="B">Negro (B)</option>
+                    <option value="R">Rojo (R)</option>
+                    <option value="G">Verde (G)</option>
+                    <option value="C">Incoloro (C)</option>
+                </select>
+
+                <input type="text" id="input-tipo" placeholder="Tipo en inglés (Creature, Instant...)" aria-label="Tipo de carta">
+
+                <button type="submit" id="btn-buscar">
+                    <span>🔍 Buscar</span>
+                </button>
+                <button type="button" class="btn-secundario" id="btn-reset">
+                    <span>Reset</span>
+                </button>
+            </form>
+
+            <div class="resultados-info">
+                <span id="txt-resultados-count">Cargando cartas...</span>
+                <span id="txt-pagina-info" class="pagina-info"></span>
+            </div>
+
+            <!-- Aviso (modo offline, búsqueda no válida, demasiadas peticiones...) -->
+            <div id="aviso-busqueda" class="aviso hidden" role="status"></div>
+
+            <!-- Contenedor del spinner -->
+            <div id="loading-spinner" class="spinner-container hidden">
+                <div class="spinner"></div>
+                <p>Consultando los pergaminos de Scryfall...</p>
+            </div>
+
+            <!-- Rejilla de cartas -->
+            <div class="grid-cartas" id="grid-cartas">
+                <!-- Se poblará dinámicamente con JS -->
+            </div>
+
+            <!-- Paginación -->
+            <nav class="paginacion" id="paginacion" aria-label="Paginación">
+                <!-- Botones de páginas -->
+            </nav>
+        </section>
+
+        <!-- ================= SECCIÓN 2: MIS MAZOS ================= -->
+        <section id="seccion-mazos" class="seccion hidden">
+            <span class="eyebrow">Tu colección</span>
+            <h1>Mis mazos arcanos</h1>
+            <div class="divisor"><span>✦</span></div>
+
+            <!-- Formulario para crear mazo -->
+            <form id="form-nuevo-mazo" class="form-nuevo-mazo">
+                <input type="text" id="nuevo-mazo-nombre" placeholder="Nombre del mazo (ej. Demonic Reanimator)" required maxlength="100" aria-label="Nombre del mazo">
+                <input type="text" id="nuevo-mazo-formato" placeholder="Formato (Commander, Standard, Modern...)" maxlength="50" aria-label="Formato">
+                <button type="submit">✦ Crear mazo</button>
+            </form>
+
+            <div class="lista-mazos" id="lista-mazos">
+                <!-- Se poblará dinámicamente -->
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 3: CONSTRUCTOR / DETALLE DE MAZO ================= -->
+        <section id="seccion-detalle-mazo" class="seccion hidden">
+            <button type="button" class="btn-secundario btn-volver" data-vista="mazos">
+                &larr; Volver a mis mazos
+            </button>
+            <span class="eyebrow">Constructor de mazo</span>
+            <h1 id="mazo-titulo-detalle">Mazo</h1>
+            <p id="mazo-subtitulo-detalle" class="subtitulo-mazo"></p>
+
+            <div class="acciones-mazo">
+                <button type="button" data-vista="grimorio">
+                    🔍 Buscar cartas para añadir
+                </button>
+            </div>
+
+            <div class="grid-mazo" id="grid-cartas-mazo">
+                <!-- Cartas del mazo -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal de Detalle de Carta -->
+    <div id="modal-carta" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-nombre">
+        <div class="modal-contenido">
+            <button type="button" class="btn-cerrar-modal" id="btn-cerrar-modal" aria-label="Cerrar modal">&times;</button>
+
+            <div class="ficha-carta">
+                <div class="ficha-imagen">
+                    <img id="modal-img" src="" alt="Carta">
+                </div>
+                <div class="ficha-info">
+                    <h1 id="modal-nombre">Nombre de Carta</h1>
+                    <p><strong>Coste de maná:</strong> <span id="modal-coste">—</span></p>
+                    <p><strong>Tipo:</strong> <span id="modal-tipo">—</span></p>
+                    <p id="modal-pt-container" class="hidden"><strong>Poder/Resistencia:</strong> <span id="modal-pt">—</span></p>
+                    <p><strong>Rareza:</strong> <span id="modal-rareza">—</span></p>
+                    <p><strong>Edición:</strong> <span id="modal-set">—</span></p>
+
+                    <div class="texto-carta" id="modal-texto">Sin texto.</div>
+
+                    <div class="seccion-anadir-mazo">
+                        <h3>Añadir a un mazo</h3>
+                        <div id="contenedor-select-mazo">
+                            <form class="form-anadir-mazo" id="form-anadir-mazo">
+                                <select id="modal-select-mazo" aria-label="Seleccionar mazo">
+                                    <!-- Opciones de mazos -->
+                                </select>
+                                <button type="submit">Añadir</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de Notificaciones -->
+    <div id="toast-notif" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <!-- Footer -->
+    <footer>
+        <p>Suso Demonic Consultation &copy; 2026. Basado en Scryfall API. Magic: The Gathering es propiedad de Wizards of the Coast.</p>
+    </footer>
+
+    <!-- Lógica JavaScript de la Aplicación (ver app.js) -->
+    <script src="app.js"></script>
+</body>
+</html>

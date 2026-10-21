@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Mis mazos · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Constructor estilo Moxfield</span>
+        <h1>Mis mazos</h1>
+    </div>
+</div>
+
+<form method="post" action="{{ url_for('crear_mazo') }}" class="form-nuevo-mazo mazo-creator-box" id="form-crear-mazo">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="comandante_id" id="input-comandante-id" value="">
+
+    <div class="campo-filtro campo-principal">
+        <label for="input-nombre-mazo">1. Nombre del mazo</label>
+        <input type="text" id="input-nombre-mazo" name="nombre" placeholder="Ej. Atraxa Superfriends, Cloud Voltron..." required maxlength="{{ max_nombre }}">
+    </div>
+
+    <div class="campo-filtro">
+        <label for="select-formato-mazo">2. Modo de juego / Formato</label>
+        <select id="select-formato-mazo" name="formato">
+            {% for grupo in grupos_formatos %}
+            <optgroup label="{{ grupo.categoria }}">
+                {% for fmt in grupo.formatos %}
+                <option value="{{ fmt.id }}"
+                        data-cmd="{{ '1' if fmt.usa_comandante else '0' }}"
+                        data-total="{{ fmt.total_objetivo }}"
+                        data-resumen="{{ fmt.resumen }}"
+                        {% if (formato_pre and fmt.id|lower == formato_pre|lower) or (not formato_pre and fmt.id == 'Commander') %}selected{% endif %}>
+                    {{ fmt.etiqueta }}
+                </option>
+                {% endfor %}
+            </optgroup>
+            {% endfor %}
+        </select>
+        <span class="formato-reglas-hint" id="resumen-reglas-formato">
+            1 Comandante + 99 cartas · Singleton (máx. 1 copia salvo tierras básicas)
+        </span>
+    </div>
+
+    <div class="campo-filtro">
+        <label for="select-bracket-mazo">3. Nivel de Poder / Bracket (1–5 Moxfield)</label>
+        <select id="select-bracket-mazo" name="bracket_objetivo">
+            <option value="0" data-resumen="Se calcula automáticamente en tiempo real analizando Game Changers, MLD, Turnos Extra y Tutores." selected>
+                ⚡ Automático (Analizar según las cartas)
+            </option>
+            {% for b in catalogo_brackets %}
+            <option value="{{ b.numero }}" data-resumen="{{ b.resumen }} ({{ b.turnos }})">
+                {{ b.titulo }} — {{ b.turnos }}
+            </option>
+            {% endfor %}
+        </select>
+        <span class="formato-reglas-hint" id="resumen-bracket-mazo">
+            Se calcula automáticamente en tiempo real analizando Game Changers, MLD, Turnos Extra y Tutores.
+        </span>
+    </div>
+
+    <div class="campo-filtro campo-principal buscador-cmd-wrap" id="bloque-elegir-cmd">
+        <label for="input-buscar-cmd" id="label-elegir-cmd">4. 👑 Elige tu Comandante (opcional ahora o dentro del mazo)</label>
+        <input type="text" id="input-buscar-cmd" placeholder="Escribe el nombre de una criatura o planeswalker legendario (ej. Cloud, Atraxa, Yuriko)..." autocomplete="off">
+        <div id="dropdown-cmd" class="autocompletar-dropdown hidden"></div>
+        <div id="cmd-seleccionado-pill" class="cmd-seleccionado-pill hidden"></div>
+    </div>
+
+    <div class="acciones-busqueda">
+        <button type="submit">+ Crear mazo</button>
+    </div>
+</form>
+
+<div class="lista-mazos">
+    {% for mazo in mazos %}
+    {% set reglas = obtener_reglas_formato(mazo['formato']) %}
+    {% set usa_cmd = reglas['usa_comandante'] %}
+    {% set meta_cartas = reglas['total_objetivo'] %}
+    {% set total_actual = (mazo['cartas_biblioteca'] + (1 if (usa_cmd and mazo['comandante_id']) else 0)) %}
+    {% set pct = ((total_actual / meta_cartas) * 100)|round|int %}
+    {% set brk = mazo['bracket'] %}
+    <div class="tarjeta-mazo">
+        <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="tarjeta-mazo-cuerpo">
+            <div class="tarjeta-mazo-top">
+                <div class="acciones-busqueda">
+                    <span class="badge-formato">{{ mazo['formato'] or 'Commander' }}</span>
+                    <span class="badge-bracket badge-bracket-{{ brk.activo }}" title="{{ brk.info_activo.resumen }}">
+                        ⚡ {{ brk.info_activo.etiqueta_corta }}
+                    </span>
+                </div>
+                <span class="cantidad">{{ total_actual }} / {{ meta_cartas }} cartas</span>
+            </div>
+
+            <div class="mazo-preview-row">
+                {% if usa_cmd and mazo['comandante_imagen'] %}
+                    <img src="{{ mazo['comandante_imagen'] }}" alt="{{ mazo['comandante_nombre'] }}" class="mazo-cmd-thumb">
+                {% elif usa_cmd %}
+                    <div class="mazo-cmd-thumb mazo-cmd-placeholder" title="Formato con Comandante">👑</div>
+                {% else %}
+                    <div class="mazo-cmd-thumb mazo-cmd-placeholder" title="Mazo {{ reglas['id'] }}">⚔️</div>
+                {% endif %}
+                <div class="mazo-preview-texto">
+                    <h3>{{ mazo['nombre'] }}</h3>
+                    {% if usa_cmd %}
+                        {% if mazo['comandante_nombre'] %}
+                            <span class="mazo-cmd-nombre">👑 {{ mazo['comandante_nombre'] }}</span>
+                            <span class="mazo-sub-detalle">1 Comandante + {{ mazo['cartas_biblioteca'] }} / {{ meta_cartas - 1 }} · 🔥 {{ brk.game_changers|length }} GC · 🔍 {{ brk.tutores|length }} Tutores</span>
+                        {% else %}
+                            <span class="mazo-sub-detalle">Sin comandante asignado · {{ mazo['cartas_biblioteca'] }} / {{ meta_cartas - 1 }} carta(s)</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="mazo-cmd-nombre">⚔️ {{ reglas['id'] }} ({{ meta_cartas }} cartas)</span>
+                        <span class="mazo-sub-detalle">Máx. {{ 'sin límite de' if reglas['max_copias'] > 4 else reglas['max_copias'] }} copia(s) · 🔥 {{ brk.game_changers|length }} GC · 🔍 {{ brk.tutores|length }} Tutores</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="barra-progreso-mazo" title="{{ total_actual }} de {{ meta_cartas }} cartas">
+                <div class="barra-progreso-fill" style="width: {{ 100 if pct > 100 else pct }}%;"></div>
+            </div>
+        </a>
+
+        <div class="tarjeta-mazo-pie">
+            <div class="acciones-busqueda">
+                <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">Abrir mazo</a>
+                <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm" title="Detectar combos de este mazo">∞ Combos</a>
+            </div>
+            <form method="post" action="{{ url_for('eliminar_mazo', mazo_id=mazo['id']) }}"
+                  onsubmit="return confirm('¿Eliminar este mazo definitivamente?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-eliminar btn-sm">Eliminar</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+        <div class="estado-vacio">
+            <h3>Todavía no has creado ningún mazo</h3>
+            <p>Elige tu Comandante arriba y empieza a construir las 99 cartas de tu mazo.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const inputCmd = document.getElementById('input-buscar-cmd');
+    const hiddenCmd = document.getElementById('input-comandante-id');
+    const dropdown = document.getElementById('dropdown-cmd');
+    const pill = document.getElementById('cmd-seleccionado-pill');
+    const selectFormato = document.getElementById('select-formato-mazo');
+    const selectBracket = document.getElementById('select-bracket-mazo');
+    const bloqueCmd = document.getElementById('bloque-elegir-cmd');
+    const resumenReglas = document.getElementById('resumen-reglas-formato');
+    const resumenBracket = document.getElementById('resumen-bracket-mazo');
+    let timer = null;
+
+    function actualizarInterfazBracket() {
+        const optB = selectBracket.options[selectBracket.selectedIndex];
+        if (optB && resumenBracket) {
+            resumenBracket.textContent = optB.dataset.resumen || '';
+        }
+    }
+
+    function actualizarInterfazFormato() {
+        const opt = selectFormato.options[selectFormato.selectedIndex];
+        if (!opt) return;
+        const usaCmd = opt.dataset.cmd === '1';
+        resumenReglas.textContent = opt.dataset.resumen || '';
+        if (opt.value === 'cEDH' && selectBracket.value === '0') {
+            selectBracket.value = '5';
+            actualizarInterfazBracket();
+        }
+        if (usaCmd) {
+            bloqueCmd.classList.remove('hidden');
+        } else {
+            bloqueCmd.classList.add('hidden');
+            hiddenCmd.value = '';
+            pill.classList.add('hidden');
+        }
+    }
+
+    selectFormato.addEventListener('change', actualizarInterfazFormato);
+    selectBracket.addEventListener('change', actualizarInterfazBracket);
+    actualizarInterfazFormato();
+    actualizarInterfazBracket();
+
+    function seleccionarComandante(carta) {
+        hiddenCmd.value = carta.id;
+        inputCmd.value = '';
+        dropdown.classList.add('hidden');
+        pill.replaceChildren();
+
+        const texto = document.createElement('span');
+        texto.textContent = `👑 Comandante: ${carta.nombre} (${carta.identidad_color || 'C'})`;
+        const btnQuitar = document.createElement('button');
+        btnQuitar.type = 'button';
+        btnQuitar.className = 'btn-quitar-pill';
+        btnQuitar.textContent = '×';
+        btnQuitar.addEventListener('click', () => {
+            hiddenCmd.value = '';
+            pill.classList.add('hidden');
+        });
+
+        pill.appendChild(texto);
+        pill.appendChild(btnQuitar);
+        pill.classList.remove('hidden');
+    }
+
+    inputCmd.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = inputCmd.value.trim();
+        if (q.length < 2) {
+            dropdown.classList.add('hidden');
+            return;
+        }
+        timer = setTimeout(async () => {
+            const resp = await fetch(`/api/cartas/autocompletar?comandante=1&q=${encodeURIComponent(q)}`);
+            const data = await resp.json();
+            dropdown.replaceChildren();
+            if (!data.cartas || data.cartas.length === 0) {
+                dropdown.classList.add('hidden');
+                return;
+            }
+            data.cartas.forEach(c => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'autocompletar-item';
+                const nombre = document.createElement('strong');
+                nombre.textContent = c.nombre;
+                const meta = document.createElement('span');
+                meta.textContent = `${c.tipo} · ${c.coste_mana}`;
+                item.appendChild(nombre);
+                item.appendChild(meta);
+                item.addEventListener('click', () => seleccionarComandante(c));
+                dropdown.appendChild(item);
+            });
+            dropdown.classList.remove('hidden');
+        }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#bloque-elegir-cmd')) {
+            dropdown.classList.add('hidden');
+        }
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}SusoMTG · Constructor de Mazos, Brackets 1–5, Combos & Spoilers HD{% endblock %}
+
+{% block content %}
+<!-- HERO PRINCIPAL ESTILO MOXFIELD.COM -->
+<section class="mox-home-hero">
+    <div class="mox-hero-glow"></div>
+    <div class="mox-hero-content">
+        <h1>Construye tus mazos, analiza tu <span class="text-gradient">Bracket (1–5)</span> y domina cada formato</h1>
+        <p class="mox-hero-lead">
+            Explora las <strong>{{ "{:,}".format(total_cartas).replace(",", ".") }} cartas en alta resolución (HD)</strong> incluidos los últimos spoilers, separa a tu Comandante de las 99, personaliza cada carta con sus <strong>Alters Oficiales</strong> y descubre tus líneas de combo con <strong>LoopLine</strong>.
+        </p>
+
+        <!-- Barra de búsqueda global con autocompletado directo -->
+        <form method="get" action="{{ url_for('index') }}" class="mox-hero-search-wrap" id="form-hero-search">
+            <div class="mox-hero-search-box">
+                <span class="search-icon">🔍</span>
+                <input type="search" name="q" id="input-hero-search"
+                       placeholder="Busca cualquier carta, comandante, spoiler o texto (ej. Cloud, Rhystic Study, Star Trek)..."
+                       autocomplete="off" aria-label="Buscar cartas en el catálogo">
+                <button type="submit" class="btn">Buscar en Catálogo &rarr;</button>
+            </div>
+            <div id="dropdown-hero-search" class="autocompletar-dropdown hidden"></div>
+        </form>
+
+        <!-- Botones de acción rápida estilo Moxfield -->
+        <div class="mox-hero-actions">
+            <a href="{{ url_for('listar_mazos') }}" class="btn btn-lg">👑 + Crear / Gestionar Mazos</a>
+            <a href="{{ url_for('index') }}" class="btn btn-secundario btn-lg">🃏 Entrar al Catálogo Completo</a>
+            <a href="{{ url_for('index', spoilers='1') }}" class="btn btn-secundario btn-lg">🔥 Spoilers ({{ total_spoilers }})</a>
+            <a href="{{ url_for('combos') }}" class="btn btn-secundario btn-lg">∞ Buscador de Combos</a>
+        </div>
+
+        <!-- Métricas en vivo -->
+        <div class="mox-hero-stats">
+            <a href="{{ url_for('index') }}" class="mox-stat-pill">
+                <strong>{{ "{:,}".format(total_cartas).replace(",", ".") }}</strong>
+                <span>Cartas en Calidad HD</span>
+            </a>
+            <a href="{{ url_for('index', spoilers='1') }}" class="mox-stat-pill">
+                <strong>{{ total_spoilers }}</strong>
+                <span>Spoilers Activos Hoy</span>
+            </a>
+            <a href="{{ url_for('listar_mazos') }}" class="mox-stat-pill">
+                <strong>26</strong>
+                <span>Modos de Juego MTG</span>
+            </a>
+            <a href="{{ url_for('listar_mazos') }}" class="mox-stat-pill">
+                <strong>B1 – B5</strong>
+                <span>Analizador de Brackets</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- SECCIÓN 1: TUS MAZOS RECIENTES & DESTACADOS (TARJETAS PANORÁMICAS ESTILO MOXFIELD) -->
+<section class="mox-home-section">
+    <div class="mox-section-header">
+        <div>
+            <span class="eyebrow">Your Decks & Featured Lists</span>
+            <h2>👑 Tus Mazos Recientes</h2>
+        </div>
+        <div class="acciones-busqueda">
+            <a href="{{ url_for('listar_mazos') }}" class="btn btn-sm">+ Nuevo Mazo</a>
+            <a href="{{ url_for('listar_mazos') }}" class="btn btn-secundario btn-sm">Ver todos mis mazos &rarr;</a>
+        </div>
+    </div>
+
+    <div class="mox-decks-showcase">
+        {% for mazo in mazos[:4] %}
+        {% set reglas = obtener_reglas_formato(mazo['formato']) %}
+        {% set usa_cmd = reglas['usa_comandante'] %}
+        {% set meta_cartas = reglas['total_objetivo'] %}
+        {% set total_actual = (mazo['cartas_biblioteca'] + (1 if (usa_cmd and mazo['comandante_id']) else 0)) %}
+        {% set brk = mazo['bracket'] %}
+        <article class="mox-deck-banner-card">
+            <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="mox-deck-art-header"
+               {% if mazo['comandante_imagen'] %}style="background-image: url('{{ mazo['comandante_imagen'] }}');"{% endif %}>
+                <div class="mox-deck-art-overlay"></div>
+                <div class="mox-deck-top-badges">
+                    <span class="badge-formato">{{ mazo['formato'] or 'Commander' }}</span>
+                    <span class="badge-bracket badge-bracket-{{ brk.activo }}">
+                        ⚡ {{ brk.info_activo.etiqueta_corta }}
+                    </span>
+                </div>
+                <div class="mox-deck-bottom-title">
+                    <h3>{{ mazo['nombre'] }}</h3>
+                    {% if mazo['comandante_nombre'] %}
+                        <span class="mox-deck-cmd-line">👑 {{ mazo['comandante_nombre'] }}</span>
+                    {% else %}
+                        <span class="mox-deck-cmd-line">⚔️ Modo {{ reglas['id'] }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            <div class="mox-deck-banner-body">
+                <div class="mox-deck-stats-row">
+                    <span>📚 <strong>{{ total_actual }} / {{ meta_cartas }}</strong> cartas</span>
+                    <span>🔥 <strong>{{ brk.game_changers|length }}</strong> Game Changers</span>
+                    <span>🔍 <strong>{{ brk.tutores|length }}</strong> Tutores</span>
+                </div>
+                <div class="mox-deck-banner-actions">
+                    <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="btn btn-sm">Abrir Constructor</a>
+                    <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">∞ Combos</a>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+
+        <!-- Tarjeta rápida para crear un nuevo mazo -->
+        <a href="{{ url_for('listar_mazos') }}" class="mox-deck-create-tile">
+            <span class="create-plus">+</span>
+            <h3>Crear un nuevo mazo</h3>
+            <p>Elige entre Commander, cEDH, Pauper, Legacy, Modern, Standard, Brawl o cualquiera de los 26 formatos.</p>
+        </a>
+    </div>
+</section>
+
+<!-- SECCIÓN 2: ÚLTIMOS SPOILERS REVELADOS EN DIRECTO (PREVIEW SEASON) -->
+<section class="mox-home-section">
+    <div class="mox-section-header">
+        <div>
+            <span class="eyebrow">Latest MTG Spoilers · Sincronizados con Scryfall</span>
+            <h2>🔥 Últimos Spoilers y Novedades HD</h2>
+        </div>
+        <div class="acciones-busqueda">
+            <a href="{{ url_for('index', spoilers='1') }}" class="btn btn-secundario btn-sm">Ver los {{ total_spoilers }} Spoilers &rarr;</a>
+        </div>
+    </div>
+
+    <div class="grid-cartas mox-home-cards-grid" id="grid-home-spoilers">
+        {% for carta in spoilers %}
+        {% set colores = carta['colores'].split(',') if carta['colores'] else [] %}
+        {% set clase_color = 'color-M' if colores|length > 1 else ('color-' + colores[0] if colores|length == 1 else 'color-C') %}
+        <div class="tarjeta-carta {{ clase_color }}" data-carta-id="{{ carta['id'] }}" data-carta-nombre="{{ carta['nombre'] }}">
+            <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="carta-visual">
+                <span class="badge-spoiler-flotante">🔥 SPOILER</span>
+                {% if carta['imagen_url'] %}
+                    <img src="{{ carta['imagen_url'] }}" alt="{{ carta['nombre'] }}" loading="lazy" class="img-carta-catalogo">
+                {% else %}
+                    <div class="sin-imagen">Sin imagen</div>
+                {% endif %}
+            </a>
+            <div class="carta-meta">
+                <div class="carta-fila-superior">
+                    <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="nombre-carta" title="{{ carta['nombre'] }}">{{ carta['nombre'] }}</a>
+                    {% if carta['coste_mana'] %}
+                        <span class="coste-carta">{{ carta['coste_mana'] | simbolos_mana }}</span>
+                    {% endif %}
+                </div>
+                <div class="carta-fila-inferior">
+                    <span class="tipo-carta" title="{{ carta['tipo'] }}">{{ carta['tipo'] }}</span>
+                    {% if carta['set_code'] %}
+                        <span class="badge-set rareza-{{ carta['rareza'] or 'common' }}">{{ carta['set_code'] | upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="carta-acciones-catalogo">
+                    <button type="button" class="btn-secundario btn-xs btn-abrir-alters">
+                        🎨 Alters HD / + Mazo
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- SECCIÓN 3: EXPLORAR Y CREAR POR FORMATO DE JUEGO (MOXFIELD FORMAT HUB) -->
+<section class="mox-home-section">
+    <div class="mox-section-header">
+        <div>
+            <span class="eyebrow">26 Formatos Oficiales y Comunitarios</span>
+            <h2>⚔️ Construye por Modo de Juego</h2>
+        </div>
+        <a href="{{ url_for('listar_mazos') }}" class="btn btn-secundario btn-sm">Ver los 26 formatos &rarr;</a>
+    </div>
+
+    <div class="mox-formats-grid">
+        <a href="{{ url_for('listar_mazos', formato='Commander') }}" class="mox-format-tile">
+            <span class="fmt-icon">👑</span>
+            <div>
+                <strong>Commander / EDH</strong>
+                <span>1 Comandante + 99 · Singleton · Brackets 1–5</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='cEDH') }}" class="mox-format-tile">
+            <span class="fmt-icon">⚡</span>
+            <div>
+                <strong>cEDH (Bracket 5)</strong>
+                <span>1 Comandante + 99 · Competitivo de Torneo</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Pauper') }}" class="mox-format-tile">
+            <span class="fmt-icon">🛡️</span>
+            <div>
+                <strong>Pauper</strong>
+                <span>60 cartas · Máx. 4 copias · Solo Comunes</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Legacy') }}" class="mox-format-tile">
+            <span class="fmt-icon">📜</span>
+            <div>
+                <strong>Legacy</strong>
+                <span>60 cartas · Máx. 4 copias · Formato Eterno</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Modern') }}" class="mox-format-tile">
+            <span class="fmt-icon">🔥</span>
+            <div>
+                <strong>Modern</strong>
+                <span>60 cartas · Máx. 4 copias · Desde 8.ª Edición</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Standard') }}" class="mox-format-tile">
+            <span class="fmt-icon">✨</span>
+            <div>
+                <strong>Standard</strong>
+                <span>60 cartas · Máx. 4 copias · Rotación actual</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Pioneer') }}" class="mox-format-tile">
+            <span class="fmt-icon">🧭</span>
+            <div>
+                <strong>Pioneer</strong>
+                <span>60 cartas · Máx. 4 copias · Desde Return to Ravnica</span>
+            </div>
+        </a>
+        <a href="{{ url_for('listar_mazos', formato='Vintage') }}" class="mox-format-tile">
+            <span class="fmt-icon">💎</span>
+            <div>
+                <strong>Vintage</strong>
+                <span>60 cartas · Power Nine y Restringidas (máx. 1)</span>
+            </div>
+        </a>
+    </div>
+</section>
+
+<!-- SECCIÓN 4: CARTAS ICÓNICAS & GAME CHANGERS (CON SELECTOR DE ALTERS OFICIALES HD) -->
+{% if staples %}
+<section class="mox-home-section">
+    <div class="mox-section-header">
+        <div>
+            <span class="eyebrow">Game Changers & Staples con Alters Oficiales</span>
+            <h2>🎨 Cartas Destacadas (Prueba sus Alters HD)</h2>
+        </div>
+        <a href="{{ url_for('index') }}" class="btn btn-secundario btn-sm">Explorar las {{ "{:,}".format(total_cartas).replace(",", ".") }} cartas &rarr;</a>
+    </div>
+
+    <div class="grid-cartas mox-home-cards-grid" id="grid-home-staples">
+        {% for carta in staples %}
+        {% set colores = carta['colores'].split(',') if carta['colores'] else [] %}
+        {% set clase_color = 'color-M' if colores|length > 1 else ('color-' + colores[0] if colores|length == 1 else 'color-C') %}
+        <div class="tarjeta-carta {{ clase_color }}" data-carta-id="{{ carta['id'] }}" data-carta-nombre="{{ carta['nombre'] }}">
+            <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="carta-visual">
+                {% if carta['imagen_url'] %}
+                    <img src="{{ carta['imagen_url'] }}" alt="{{ carta['nombre'] }}" loading="lazy" class="img-carta-catalogo">
+                {% else %}
+                    <div class="sin-imagen">Sin imagen</div>
+                {% endif %}
+            </a>
+            <div class="carta-meta">
+                <div class="carta-fila-superior">
+                    <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="nombre-carta" title="{{ carta['nombre'] }}">{{ carta['nombre'] }}</a>
+                    {% if carta['coste_mana'] %}
+                        <span class="coste-carta">{{ carta['coste_mana'] | simbolos_mana }}</span>
+                    {% endif %}
+                </div>
+                <div class="carta-fila-inferior">
+                    <span class="tipo-carta" title="{{ carta['tipo'] }}">{{ carta['tipo'] }}</span>
+                    {% if carta['set_code'] %}
+                        <span class="badge-set rareza-{{ carta['rareza'] or 'common' }}">{{ carta['set_code'] | upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="carta-acciones-catalogo">
+                    <button type="button" class="btn-secundario btn-xs btn-abrir-alters">
+                        🎨 Ver Alters Oficiales HD
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const MAZOS_DISPONIBLES = [
+        {% for m in mazos %}
+            { id: {{ m['id'] | tojson }}, nombre: {{ m['nombre'] | tojson }} },
+        {% endfor %}
+    ];
+
+    // Abrir el modal de Alters Oficiales HD desde cualquiera de las cuadrículas de la portada
+    document.querySelectorAll('#grid-home-spoilers, #grid-home-staples').forEach(grid => {
+        grid.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-abrir-alters');
+            if (!btn) return;
+            const tarjeta = btn.closest('.tarjeta-carta');
+            const imgEl = tarjeta.querySelector('.img-carta-catalogo');
+            abrirSelectorAlters({
+                cartaId: tarjeta.dataset.cartaId,
+                nombreCarta: tarjeta.dataset.cartaNombre,
+                mazosLista: MAZOS_DISPONIBLES,
+                modo: 'catalogo',
+                onImagenCambiada: (nuevaUrl) => {
+                    if (imgEl) imgEl.src = nuevaUrl;
+                },
+            });
+        });
+    });
+
+    // Autocompletado instantáneo en el buscador principal del Hero estilo Moxfield
+    const inputHero = document.getElementById('input-hero-search');
+    const dropHero = document.getElementById('dropdown-hero-search');
+    let timerHero = null;
+
+    if (inputHero && dropHero) {
+        inputHero.addEventListener('input', () => {
+            clearTimeout(timerHero);
+            const q = inputHero.value.trim();
+            if (q.length < 2) {
+                dropHero.classList.add('hidden');
+                return;
+            }
+            timerHero = setTimeout(async () => {
+                const resp = await fetch(`/api/cartas/autocompletar?q=${encodeURIComponent(q)}`);
+                const data = await resp.json();
+                dropHero.replaceChildren();
+                if (!data.cartas || data.cartas.length === 0) {
+                    dropHero.classList.add('hidden');
+                    return;
+                }
+                data.cartas.forEach(c => {
+                    const link = document.createElement('a');
+                    link.href = `/carta/${encodeURIComponent(c.id)}`;
+                    link.className = 'autocompletar-item';
+                    const nombre = document.createElement('strong');
+                    nombre.textContent = c.nombre;
+                    const meta = document.createElement('span');
+                    meta.textContent = `${c.tipo} · ${c.coste_mana}`;
+                    link.appendChild(nombre);
+                    link.appendChild(meta);
+                    dropHero.appendChild(link);
+                });
+                dropHero.classList.remove('hidden');
+            }, 180);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#form-hero-search')) {
+                dropHero.classList.add('hidden');
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

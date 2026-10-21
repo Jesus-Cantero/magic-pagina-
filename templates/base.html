@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Token CSRF: lo lee static/js/api.js para enviarlo en las peticiones fetch() -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}Suso · MTG Deckbuilder & Card Search{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <div class="navbar-inner">
+            <div class="navbar-left">
+                <a href="{{ url_for('home') }}" class="logo">
+                    <span class="logo-mark">◆</span>
+                    <span class="logo-text">Suso<span class="logo-accent">MTG</span></span>
+                    <span class="sub">Demonic Consultation</span>
+                </a>
+                <nav class="nav-links" aria-label="Navegación principal">
+                    <a href="{{ url_for('home') }}"
+                       class="{% if request.endpoint == 'home' %}active{% endif %}">
+                        Inicio
+                    </a>
+                    <a href="{{ url_for('index') }}"
+                       class="{% if request.endpoint in ('index', 'carta_detalle') and request.args.get('spoilers') != '1' %}active{% endif %}">
+                        Explorar cartas
+                    </a>
+                    <a href="{{ url_for('index', spoilers='1') }}"
+                       class="{% if request.endpoint == 'index' and request.args.get('spoilers') == '1' %}active{% endif %}">
+                        🔥 Spoilers
+                    </a>
+                    <a href="{{ url_for('listar_mazos') }}"
+                       class="{% if request.endpoint in ('listar_mazos', 'ver_mazo') %}active{% endif %}">
+                        Mis mazos
+                    </a>
+                    <a href="{{ url_for('combos') }}"
+                       class="{% if request.endpoint == 'combos' %}active{% endif %}">
+                        ∞ Combos
+                    </a>
+                </nav>
+            </div>
+
+            <div class="navbar-right">
+                <form method="get" action="{{ url_for('index') }}" class="nav-search" role="search">
+                    <input type="search" name="q" placeholder="Búsqueda rápida de cartas..."
+                           value="{{ request.args.get('q', '') }}" aria-label="Búsqueda rápida de cartas">
+                </form>
+
+                <div class="nav-auth">
+                    {% if usuario_actual %}
+                        <a href="{{ url_for('cuenta') }}" class="user-pill {% if request.endpoint == 'cuenta' %}active{% endif %}">
+                            {% if usuario_actual['avatar_url'] %}
+                                <img src="{{ usuario_actual['avatar_url'] }}" alt="" class="user-avatar">
+                            {% else %}
+                                <span class="user-initial">{{ usuario_actual['nombre'][0] | upper }}</span>
+                            {% endif %}
+                            <span class="user-name">{{ usuario_actual['nombre'] }}</span>
+                        </a>
+                        <form method="post" action="{{ url_for('logout') }}" class="form-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-secundario btn-sm">Salir</button>
+                        </form>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="btn btn-secundario btn-sm">Iniciar sesión</a>
+                        <a href="{{ url_for('registro') }}" class="btn btn-sm">Crear cuenta</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="contenedor">
+        {% with mensajes = get_flashed_messages() %}
+            {% if mensajes %}
+                <div class="flash">
+                    {% for m in mensajes %}<p>{{ m }}</p>{% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="pie">
+        <div class="pie-inner">
+            <span><strong>SusoMTG</strong> · Demonic Consultation</span>
+            <span>Datos e imágenes HD de <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a> · Magic: The Gathering es propiedad de Wizards of the Coast.</span>
+        </div>
+    </footer>
+
+    <!-- Modal global de Alters Oficiales y Selección de Arte en Alta Calidad (HD) -->
+    <div id="modal-alters-oficiales" class="modal-alters-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-alters-titulo">
+        <div class="modal-alters-dialog">
+            <header class="modal-alters-header">
+                <div>
+                    <span class="eyebrow">Ediciones Oficiales · Secret Lair · Borderless · Showcase (HD)</span>
+                    <h2 id="modal-alters-titulo">🎨 Alters Oficiales</h2>
+                </div>
+                <button type="button" class="btn-cerrar-modal" id="btn-cerrar-modal-alters" aria-label="Cerrar">&times;</button>
+            </header>
+            <div id="modal-alters-subbarra" class="modal-alters-subbarra"></div>
+            <div id="modal-alters-cuerpo" class="modal-alters-grid"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

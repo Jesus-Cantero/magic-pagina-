@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Explorar cartas · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Base de datos Oracle HD · Actualizada con Spoilers</span>
+        <h1>{% if solo_spoilers %}🔥 Spoilers y Próximos Lanzamientos{% else %}Explorar cartas{% endif %}</h1>
+    </div>
+    <div class="resultados-info acciones-busqueda">
+        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, spoilers=None if solo_spoilers else '1', orden='recientes') }}"
+           class="btn btn-sm {% if solo_spoilers %}btn-primario{% else %}btn-secundario{% endif %}">
+            🔥 {% if solo_spoilers %}Viendo Spoilers (Ver todo){% else %}Ver Spoilers & Novedades{% endif %}
+        </a>
+        <button type="button" class="btn btn-secundario btn-sm" id="btn-sync-spoilers" title="Descargar en directo los últimos spoilers de hoy desde Scryfall">
+            🔄 Sincronizar Spoilers de Hoy
+        </button>
+        <span><strong>{{ "{:,}".format(total).replace(",", ".") }}</strong> carta(s)</span>
+        {% if total_paginas > 1 %}
+            <span class="pagina-info">Pág. {{ pagina }} / {{ total_paginas }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<form method="get" class="form-busqueda">
+    {% if solo_spoilers %}
+        <input type="hidden" name="spoilers" value="1">
+    {% endif %}
+    <div class="campo-filtro campo-principal">
+        <label for="filtro-q">Nombre, texto de reglas o expansión</label>
+        <input type="text" id="filtro-q" name="q" placeholder="Ej. Cloud, Star Trek, Demonic Consultation, Draw a card..." value="{{ texto }}">
+    </div>
+
+    <div class="campo-filtro">
+        <label for="filtro-tipo">Línea de tipo</label>
+        <input type="text" id="filtro-tipo" name="tipo" placeholder="Ej. Creature, Instant, Artifact..." value="{{ tipo }}">
+    </div>
+
+    <div class="campo-filtro campo-color">
+        <label for="filtro-color">Color</label>
+        <select id="filtro-color" name="color">
+            <option value="">Todos los colores</option>
+            <option value="W" {% if color == 'W' %}selected{% endif %}>☀️ Blanco (W)</option>
+            <option value="U" {% if color == 'U' %}selected{% endif %}>💧 Azul (U)</option>
+            <option value="B" {% if color == 'B' %}selected{% endif %}>💀 Negro (B)</option>
+            <option value="R" {% if color == 'R' %}selected{% endif %}>🔥 Rojo (R)</option>
+            <option value="G" {% if color == 'G' %}selected{% endif %}>🌲 Verde (G)</option>
+            <option value="C" {% if color == 'C' %}selected{% endif %}>◇ Incoloro (C)</option>
+        </select>
+    </div>
+
+    <div class="campo-filtro campo-color">
+        <label for="filtro-orden">Ordenar por</label>
+        <select id="filtro-orden" name="orden">
+            <option value="recientes" {% if orden == 'recientes' %}selected{% endif %}>🔥 Más recientes y Spoilers</option>
+            <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>🔤 Alfabético (A–Z)</option>
+        </select>
+    </div>
+
+    <div class="acciones-busqueda">
+        <button type="submit">Filtrar</button>
+        {% if texto or tipo or color or solo_spoilers or orden == 'recientes' %}
+            <a href="{{ url_for('index') }}" class="btn btn-secundario">Limpiar</a>
+        {% endif %}
+    </div>
+</form>
+
+<p id="mensaje-catalogo" class="texto-suave hidden" role="status"></p>
+
+<div class="grid-cartas" id="grid-catalogo-cartas">
+    {% for carta in cartas %}
+    {% set colores = carta['colores'].split(',') if carta['colores'] else [] %}
+    {% set clase_color = 'color-M' if colores|length > 1 else ('color-' + colores[0] if colores|length == 1 else 'color-C') %}
+    <div class="tarjeta-carta {{ clase_color }}" data-carta-id="{{ carta['id'] }}" data-carta-nombre="{{ carta['nombre'] }}">
+        <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="carta-visual">
+            {% if carta['es_spoiler'] %}
+                <span class="badge-spoiler-flotante">🔥 SPOILER</span>
+            {% endif %}
+            {% if carta['imagen_url'] %}
+                <img src="{{ carta['imagen_url'] }}" alt="{{ carta['nombre'] }}" loading="lazy" class="img-carta-catalogo">
+            {% else %}
+                <div class="sin-imagen">Sin imagen</div>
+            {% endif %}
+        </a>
+        <div class="carta-meta">
+            <div class="carta-fila-superior">
+                <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="nombre-carta" title="{{ carta['nombre'] }}">{{ carta['nombre'] }}</a>
+                {% if carta['coste_mana'] %}
+                    <span class="coste-carta">{{ carta['coste_mana'] | simbolos_mana }}</span>
+                {% endif %}
+            </div>
+            <div class="carta-fila-inferior">
+                <span class="tipo-carta" title="{{ carta['tipo'] }}">{{ carta['tipo'] }}</span>
+                {% if carta['set_code'] %}
+                    <span class="badge-set rareza-{{ carta['rareza'] or 'common' }}">{{ carta['set_code'] | upper }}</span>
+                {% endif %}
+            </div>
+            <div class="carta-acciones-catalogo">
+                <button type="button" class="btn-secundario btn-xs btn-abrir-alters" title="Ver y elegir entre todos los Alters Oficiales HD y añadir a un mazo">
+                    🎨 Alters Oficiales / + Mazo
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        <div class="estado-vacio">
+            <h3>No se encontraron cartas</h3>
+            <p>Prueba con otros términos de búsqueda o limpia los filtros activos.</p>
+        </div>
+    {% endfor %}
+</div>
+
+{# Paginación con ventana: 1 … 48 49 [50] 51 52 … 1300 #}
+{% if total_paginas > 1 %}
+<nav class="paginacion" aria-label="Paginación">
+    {% if pagina > 1 %}
+        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina - 1) }}" aria-label="Página anterior">&laquo; Anterior</a>
+    {% endif %}
+    {% for p in paginas %}
+        {% if p is none %}
+            <span class="puntos">…</span>
+        {% else %}
+            <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=p) }}"
+               class="{% if p == pagina %}activa{% endif %}"
+               {% if p == pagina %}aria-current="page"{% endif %}>{{ p }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if pagina < total_paginas %}
+        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina + 1) }}" aria-label="Página siguiente">Siguiente &raquo;</a>
+    {% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const MAZOS_DISPONIBLES = [
+        {% for m in mazos %}
+            { id: {{ m['id'] | tojson }}, nombre: {{ m['nombre'] | tojson }} },
+        {% endfor %}
+    ];
+
+    document.getElementById('grid-catalogo-cartas').addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-abrir-alters');
+        if (!btn) return;
+        const tarjeta = btn.closest('.tarjeta-carta');
+        const imgEl = tarjeta.querySelector('.img-carta-catalogo');
+        abrirSelectorAlters({
+            cartaId: tarjeta.dataset.cartaId,
+            nombreCarta: tarjeta.dataset.cartaNombre,
+            mazosLista: MAZOS_DISPONIBLES,
+            modo: 'catalogo',
+            onImagenCambiada: (nuevaUrl) => {
+                if (imgEl) imgEl.src = nuevaUrl;
+            },
+        });
+    });
+
+    const btnSync = document.getElementById('btn-sync-spoilers');
+    const msg = document.getElementById('mensaje-catalogo');
+    if (btnSync) {
+        btnSync.addEventListener('click', async () => {
+            btnSync.disabled = true;
+            btnSync.textContent = '⏳ Sincronizando Spoilers con Scryfall...';
+            msg.classList.remove('hidden');
+            msg.textContent = 'Descargando las cartas y spoilers más recientes en calidad HD desde Scryfall...';
+            try {
+                const res = await enviarJSON('/api/cartas/sincronizar_spoilers', {});
+                msg.textContent = `✓ ¡Catálogo actualizado! ${res.actualizadas} cartas/spoilers sincronizadas en alta calidad.`;
+                setTimeout(() => window.location.reload(), 700);
+            } catch (err) {
+                msg.textContent = `Error: ${err.message}`;
+                btnSync.disabled = false;
+                btnSync.textContent = '🔄 Sincronizar Spoilers de Hoy';
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

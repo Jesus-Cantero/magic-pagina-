@@ -1,0 +1,730 @@
+{% extends "base.html" %}
+{% block title %}{{ mazo['nombre'] }} · Constructor Moxfield · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="barra-superior-detalle">
+    <a href="{{ url_for('listar_mazos') }}" class="btn btn-secundario btn-sm">&larr; Volver a mis mazos</a>
+    <div class="acciones-busqueda">
+        <button type="button" class="btn btn-secundario btn-sm active" id="btn-vista-visual">🃏 Vista Visual</button>
+        <button type="button" class="btn btn-secundario btn-sm" id="btn-vista-lista">☰ Vista Lista Moxfield</button>
+        <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">∞ Analizar combos</a>
+        <a href="{{ url_for('index') }}" class="btn btn-sm">+ Explorar catálogo</a>
+    </div>
+</div>
+
+<!-- Cabecera principal del mazo estilo Moxfield -->
+<div class="cabecera-mazo">
+    <div class="cabecera-mazo-info">
+        <div class="mazo-badges">
+            <label for="select-cambiar-formato" class="sr-only">Cambiar modo de juego</label>
+            <select id="select-cambiar-formato" class="select-formato-header" title="Cambiar modo de juego del mazo">
+                {% for grupo in grupos_formatos %}
+                <optgroup label="{{ grupo.categoria }}">
+                    {% for fmt in grupo.formatos %}
+                    <option value="{{ fmt.id }}" {% if fmt.id|lower == (mazo['formato'] or 'Commander')|lower %}selected{% endif %}>
+                        {{ fmt.id }} ({{ fmt.total_objetivo }} cartas)
+                    </option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+
+            <span class="badge-bracket badge-bracket-{{ bracket.activo }}" title="{{ bracket.info_activo.resumen }}">
+                ⚡ {{ bracket.info_activo.etiqueta_corta }}
+                {% if bracket.objetivo > 0 and bracket.objetivo != bracket.estimado %}
+                    (Est. B{{ bracket.estimado }})
+                {% endif %}
+            </span>
+
+            {% if total_ilegales == 0 %}
+                <span class="chip chip-legal" title="Todas las cartas cumplen las normas de {{ reglas_formato.id }}">
+                    ✓ Legal en {{ reglas_formato.id }}
+                </span>
+            {% else %}
+                <span class="chip chip-ilegal" title="Hay cartas que no cumplen la legalidad o el límite de copias de {{ reglas_formato.id }}">
+                    ⚠️ {{ total_ilegales }} carta(s) no legal(es) en {{ reglas_formato.id }}
+                </span>
+            {% endif %}
+
+            {% if es_commander and comandante and comandante['identidad_color'] %}
+                <span class="chip" title="Identidad de color del Comandante">
+                    Identidad:
+                    {% for col in comandante['identidad_color'].split(',') if col %}
+                        {{ ('{' ~ col ~ '}') | simbolos_mana }}
+                    {% endfor %}
+                </span>
+            {% endif %}
+            {% if mazo['creado_en'] %}
+                <span class="mazo-fecha">Actualizado: {{ mazo['creado_en'][:10] }}</span>
+            {% endif %}
+        </div>
+        <h1>{{ mazo['nombre'] }}</h1>
+        {% if es_commander %}
+            {% if comandante %}
+                <p class="subtitulo-cmd-header">👑 Comandante: <strong>{{ comandante['nombre'] }}</strong> · Biblioteca: <strong>{{ cartas_biblioteca }} / {{ objetivo_biblioteca }}</strong> cartas · {{ reglas_formato.resumen }}</p>
+            {% else %}
+                <p class="subtitulo-cmd-header">Sin comandante asignado · Biblioteca: <strong>{{ cartas_biblioteca }} / {{ objetivo_biblioteca }}</strong> cartas · {{ reglas_formato.resumen }}</p>
+            {% endif %}
+        {% else %}
+            <p class="subtitulo-cmd-header">⚔️ Modo <strong>{{ reglas_formato.id }}</strong> · <strong>{{ cartas_biblioteca }} / {{ objetivo_biblioteca }}</strong> cartas · {{ reglas_formato.resumen }}</p>
+        {% endif %}
+    </div>
+
+    <div class="estadisticas-mazo">
+        {% if es_commander %}
+        <div class="stat-box">
+            <span class="stat-valor">{% if comandante %}1 / 1{% else %}0 / 1{% endif %}</span>
+            <span class="stat-label">Comandante</span>
+        </div>
+        {% else %}
+        <div class="stat-box">
+            <span class="stat-valor">{{ '∞' if reglas_formato.max_copias > 4 else ('x' ~ reglas_formato.max_copias) }}</span>
+            <span class="stat-label">Máx. Copias</span>
+        </div>
+        {% endif %}
+        <div class="stat-box">
+            <span class="stat-valor" id="stat-biblioteca">{{ cartas_biblioteca }} / {{ objetivo_biblioteca }}</span>
+            <span class="stat-label">Biblioteca ({{ objetivo_biblioteca }})</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-valor" id="total-cartas">{{ total_cartas }} / {{ objetivo_total }}</span>
+            <span class="stat-label">Total Mazo</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-valor">{{ cmc_medio }}</span>
+            <span class="stat-label">CMC Medio</span>
+        </div>
+    </div>
+</div>
+
+<!-- Barra rápida de añadir cartas estilo Moxfield (sin salir del mazo) -->
+<div class="moxfield-quickbar" id="moxfield-quickbar">
+    <div class="campo-filtro campo-principal">
+        <label for="input-quick-add">
+            {% if es_commander %}
+                ⚡ Añadir carta rápida a las {{ objetivo_biblioteca }} o elegir Comandante
+            {% else %}
+                ⚡ Añadir carta rápida al mazo ({{ reglas_formato.id }} · {{ objetivo_total }} cartas)
+            {% endif %}
+        </label>
+        <input type="text" id="input-quick-add" placeholder="Escribe el nombre de cualquier carta (ej. Sol Ring, Lightning Bolt, Brainstorm, Counterspell)..." autocomplete="off">
+    </div>
+    <div id="dropdown-quick-add" class="autocompletar-dropdown hidden"></div>
+</div>
+
+<p id="mensaje-mazo" class="mensaje-error" role="status"></p>
+
+<!-- Layout en 2 columnas estilo Moxfield: Izquierda (Comandante o Info Formato + Curva de Maná) | Derecha (Biblioteca por tipo) -->
+<div class="moxfield-deck-layout">
+
+    <!-- COLUMNA IZQUIERDA: ZONA DE COMANDANTE (SI EL FORMATO USA COMANDANTE) + CURVA DE MANÁ Y ESTADÍSTICAS -->
+    <aside class="moxfield-sidebar">
+
+        {% if es_commander %}
+        <!-- ZONA 1: COMANDANTE (SEPARADO DEL MAZO PRINCIPAL) -->
+        <section class="panel-comandante">
+            <div class="panel-comandante-header">
+                <span class="eyebrow">Zona de Mando · 1 Carta</span>
+                <h2>👑 Comandante</h2>
+            </div>
+
+            {% if comandante %}
+                <div class="comandante-card-destacada">
+                    <a href="{{ url_for('carta_detalle', carta_id=comandante['id']) }}" class="carta-visual">
+                        <span class="badge-cmd-flotante">👑 COMANDANTE</span>
+                        {% if comandante['imagen_url'] %}
+                            <img src="{{ comandante['imagen_url'] }}" alt="{{ comandante['nombre'] }}">
+                        {% else %}
+                            <div class="sin-imagen">Sin imagen</div>
+                        {% endif %}
+                    </a>
+                    <div class="comandante-meta">
+                        <div class="carta-fila-superior">
+                            <a href="{{ url_for('carta_detalle', carta_id=comandante['id']) }}" class="nombre-carta">{{ comandante['nombre'] }}</a>
+                            {% if comandante['coste_mana'] %}
+                                <span class="coste-carta">{{ comandante['coste_mana'] | simbolos_mana }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="tipo-carta">{{ comandante['tipo'] }}</span>
+                        {% if comandante.etiquetas_bracket %}
+                            <div class="carta-bracket-tags">
+                                {% for clase_tag, texto_tag in comandante.etiquetas_bracket %}
+                                    <span class="tag-barometro tag-barometro-{{ clase_tag }}">{{ texto_tag }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="comandante-acciones">
+                            <button type="button" class="btn-secundario btn-sm" id="btn-alter-cmd"
+                                    data-carta-id="{{ comandante['id'] }}"
+                                    data-carta-nombre="{{ comandante['nombre'] }}"
+                                    title="Cambiar imagen del Comandante por un Alter Oficial HD">🎨 Alter HD</button>
+                            <button type="button" class="btn-secundario btn-sm" id="btn-cambiar-cmd">Cambiar</button>
+                            <button type="button" class="btn-eliminar btn-sm" id="btn-quitar-cmd">Quitar</button>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="comandante-vacio">
+                    <p>Elige primero a tu <strong>Comandante</strong> para liderar el mazo y construir las {{ objetivo_biblioteca }} cartas restantes a su alrededor.</p>
+                </div>
+            {% endif %}
+
+            <!-- Buscador directo de Comandante -->
+            <div class="buscador-cmd-inline {% if comandante %}hidden{% endif %}" id="caja-buscar-cmd">
+                <label for="input-cmd-inline">Buscar criatura o planeswalker legendario:</label>
+                <input type="text" id="input-cmd-inline" placeholder="Ej. Cloud, Atraxa, Yuriko, Urza..." autocomplete="off">
+                <div id="dropdown-cmd-inline" class="autocompletar-dropdown hidden"></div>
+            </div>
+        </section>
+        {% else %}
+        <!-- ZONA 1 (FORMATOS SIN COMANDANTE: PAUPER, LEGACY, MODERN, STANDARD, ETC.) -->
+        <section class="panel-comandante panel-formato-info">
+            <div class="panel-comandante-header">
+                <span class="eyebrow">Modo de Juego Seleccionado</span>
+                <h2>⚔️ {{ reglas_formato.id }}</h2>
+            </div>
+            <p class="formato-descripcion-panel">{{ reglas_formato.resumen }}</p>
+            <div class="formato-reglas-grid">
+                <div>
+                    <span>Tamaño objetivo</span>
+                    <strong>{{ objetivo_total }} cartas</strong>
+                </div>
+                <div>
+                    <span>Límite por carta</span>
+                    <strong>{{ 'Sin límite' if reglas_formato.max_copias > 4 else (reglas_formato.max_copias ~ ' copia(s)') }}</strong>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- ZONA 2: ANALIZADOR DE BRACKET (1 AL 5 ESTILO MOXFIELD) -->
+        <section class="panel-bracket-moxfield">
+            <div class="panel-comandante-header">
+                <div class="bracket-header-top">
+                    <span class="eyebrow">Sistema Oficial WotC / Moxfield</span>
+                    <select id="select-cambiar-bracket" class="select-bracket-mini" title="Elegir Bracket objetivo o dejar en automático">
+                        <option value="0" {% if bracket.objetivo == 0 %}selected{% endif %}>⚡ Auto (Est. B{{ bracket.estimado }})</option>
+                        {% for b in bracket.catalogo %}
+                        <option value="{{ b.numero }}" {% if bracket.objetivo == b.numero %}selected{% endif %}>
+                            Fijar B{{ b.numero }} · {{ b.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <h2>⚡ {{ bracket.info_activo.titulo }}</h2>
+            </div>
+
+            <!-- Medidor visual de 5 niveles (1 a 5) -->
+            <div class="bracket-gauge" role="group" aria-label="Escala de Brackets del 1 al 5">
+                {% for b in bracket.catalogo %}
+                <button type="button"
+                        class="bracket-step bracket-step-{{ b.numero }} {% if b.numero == bracket.activo %}active{% endif %} {% if b.numero == bracket.estimado %}is-estimated{% endif %}"
+                        data-bracket="{{ b.numero }}"
+                        title="Haz clic para fijar {{ b.titulo }} ({{ b.turnos }})">
+                    <span class="step-num">{{ b.numero }}</span>
+                    <span class="step-name">{{ b.nombre }}</span>
+                </button>
+                {% endfor %}
+            </div>
+
+            <div class="bracket-meta-banner">
+                <span class="bracket-turnos-pill">⏱️ Partidas de {{ bracket.info_activo.turnos }}</span>
+                <span class="bracket-est-pill">
+                    Estimado por cartas: <strong>B{{ bracket.estimado }} ({{ bracket.info_estimado.nombre }})</strong>
+                </span>
+            </div>
+
+            <p class="bracket-desc">{{ bracket.info_activo.descripcion }}</p>
+
+            {% if bracket.alerta_objetivo %}
+                <div class="bracket-alerta-box">
+                    ⚠️ {{ bracket.alerta_objetivo }}
+                </div>
+            {% endif %}
+
+            <!-- Los 4 Barómetros Oficiales de Moxfield -->
+            <div class="barometros-moxfield-grid">
+                <div class="barometro-item {% if bracket.game_changers %}has-items{% endif %}">
+                    <div class="barometro-top">
+                        <span class="barometro-label">🔥 Game Changers</span>
+                        <strong class="barometro-count">{{ bracket.game_changers|length }}</strong>
+                    </div>
+                    <span class="barometro-rule">B1-B2: 0 · B3: máx. 3 · B4-B5: ∞</span>
+                    {% if bracket.game_changers %}
+                        <div class="barometro-cards">
+                            {% for c in bracket.game_changers %}
+                                <span class="barometro-card-pill">{{ c.nombre }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="barometro-item {% if bracket.mld %}has-items-warn{% endif %}">
+                    <div class="barometro-top">
+                        <span class="barometro-label">🌋 Mass Land Denial</span>
+                        <strong class="barometro-count">{{ bracket.mld|length }}</strong>
+                    </div>
+                    <span class="barometro-rule">B1-B3: 0 permitidas · B4-B5: sí</span>
+                    {% if bracket.mld %}
+                        <div class="barometro-cards">
+                            {% for c in bracket.mld %}
+                                <span class="barometro-card-pill">{{ c.nombre }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="barometro-item {% if bracket.turnos_extra %}has-items{% endif %}">
+                    <div class="barometro-top">
+                        <span class="barometro-label">⏳ Turnos Extra</span>
+                        <strong class="barometro-count">{{ bracket.turnos_extra|length }}</strong>
+                    </div>
+                    <span class="barometro-rule">B1: 0 · B2-B3: sin encadenar</span>
+                    {% if bracket.turnos_extra %}
+                        <div class="barometro-cards">
+                            {% for c in bracket.turnos_extra %}
+                                <span class="barometro-card-pill">{{ c.nombre }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="barometro-item {% if bracket.tutores %}has-items{% endif %}">
+                    <div class="barometro-top">
+                        <span class="barometro-label">🔍 Tutores (No-Tierra)</span>
+                        <strong class="barometro-count">{{ bracket.tutores|length }}</strong>
+                    </div>
+                    <span class="barometro-rule">Búsqueda de piezas en biblioteca</span>
+                    {% if bracket.tutores %}
+                        <div class="barometro-cards">
+                            {% for c in bracket.tutores %}
+                                <span class="barometro-card-pill">{{ c.nombre }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <ul class="bracket-motivos-lista">
+                {% for motivo in bracket.motivos %}
+                    <li>{{ motivo }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <!-- ZONA 3: CURVA DE MANÁ VISUAL (COMO MOXFIELD) -->
+        <section class="panel-curva-mana">
+            <div class="panel-comandante-header">
+                <span class="eyebrow">Analíticas del Mazo (sin tierras)</span>
+                <h2>📊 Curva de Maná</h2>
+            </div>
+
+            <div class="curva-chart" aria-label="Gráfico de curva de maná">
+                {% for barra in curva_mana %}
+                <div class="curva-col" title="Coste {{ barra.etiqueta }}: {{ barra.cantidad }} carta(s)">
+                    <span class="curva-count">{{ barra.cantidad }}</span>
+                    <div class="curva-bar-track">
+                        <div class="curva-bar-fill" style="height: {{ barra.porcentaje }}%;"></div>
+                    </div>
+                    <span class="curva-cmc">{{ barra.etiqueta }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="curva-resumen">
+                <span>Coste de maná medio (CMC):</span>
+                <strong>{{ cmc_medio }}</strong>
+            </div>
+
+            <!-- Distribución de colores -->
+            <div class="colores-distribucion">
+                <span class="sub-label">Distribución por color</span>
+                <div class="colores-pills">
+                    {% for col in ['W', 'U', 'B', 'R', 'G', 'C'] %}
+                        <span class="color-stat-pill">
+                            {{ ('{' ~ col ~ '}') | simbolos_mana }}
+                            <strong>{{ conteo_colores[col] }}</strong>
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+    </aside>
+
+    <!-- COLUMNA DERECHA: CARTAS DE LA BIBLIOTECA AGRUPADAS POR TIPO -->
+    <div class="moxfield-mainboard" id="grid-mazo">
+
+        <div class="mainboard-header">
+            <div>
+                <span class="eyebrow">
+                    {% if es_commander %}
+                        Mazo Principal (Separado del Comandante)
+                    {% else %}
+                        Mazo Principal · {{ reglas_formato.id }}
+                    {% endif %}
+                </span>
+                <h2>📚 Biblioteca ({{ cartas_biblioteca }} / {{ objetivo_biblioteca }} cartas)</h2>
+            </div>
+        </div>
+
+        {% if grupos %}
+            <!-- VISTA 1: AGRUPADA VISUAL (POR DEFECTO) -->
+            <div id="contenedor-vista-visual" class="grupos-moxfield-visual">
+                {% for grupo in grupos %}
+                <section class="grupo-tipo-section">
+                    <header class="grupo-tipo-header">
+                        <h3>{{ grupo.nombre }} <span>({{ grupo.total }})</span></h3>
+                    </header>
+                    <div class="grid-grupo-cartas">
+                        {% for carta in grupo.cartas %}
+                        <div class="tarjeta-carta-mazo {% if not carta.es_legal %}carta-fuera-norma{% endif %}" data-carta-id="{{ carta['id'] }}">
+                            <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="carta-visual">
+                                <span class="badge-cantidad-flotante">x<span class="valor-cantidad">{{ carta['cantidad'] }}</span></span>
+                                {% if not carta.es_legal %}
+                                    <span class="badge-ilegal-flotante" title="{{ carta.aviso_legalidad }}">⚠️ {{ carta.aviso_legalidad }}</span>
+                                {% endif %}
+                                {% if carta['imagen_url'] %}
+                                    <img src="{{ carta['imagen_url'] }}" alt="{{ carta['nombre'] }}" loading="lazy">
+                                {% else %}
+                                    <div class="sin-imagen">Sin imagen</div>
+                                {% endif %}
+                            </a>
+                            <div class="carta-meta">
+                                <div class="carta-fila-superior">
+                                    <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="nombre-carta" title="{{ carta['nombre'] }}">{{ carta['nombre'] }}</a>
+                                    {% if carta['coste_mana'] %}
+                                        <span class="coste-carta">{{ carta['coste_mana'] | simbolos_mana }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if carta.etiquetas_bracket %}
+                                    <div class="carta-bracket-tags">
+                                        {% for clase_tag, texto_tag in carta.etiquetas_bracket %}
+                                            <span class="tag-barometro tag-barometro-{{ clase_tag }}">{{ texto_tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="acciones-carta {% if es_commander %}acciones-carta-5{% else %}acciones-carta-4{% endif %}">
+                                    <button type="button" class="btn-secundario" data-accion="restar" title="Quitar 1 copia">−</button>
+                                    <button type="button" class="btn-secundario" data-accion="anadir" title="Añadir 1 copia">+</button>
+                                    <button type="button" class="btn-secundario" data-accion="alter" title="Elegir Alter Oficial HD para esta carta">🎨</button>
+                                    {% if es_commander %}
+                                        <button type="button" class="btn-secundario" data-accion="comandante" title="Elegir como Comandante del mazo">👑</button>
+                                    {% endif %}
+                                    <button type="button" data-accion="quitar" class="btn-eliminar" title="Quitar de la biblioteca">×</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
+
+            <!-- VISTA 2: LISTA COMPACTA POR COLUMNAS (ESTILO MOXFIELD CLÁSICO) -->
+            <div id="contenedor-vista-lista" class="grupos-moxfield-lista hidden">
+                {% for grupo in grupos %}
+                <section class="moxfield-list-group">
+                    <header class="moxfield-list-header">
+                        <span>{{ grupo.nombre }} ({{ grupo.total }})</span>
+                    </header>
+                    <ul class="moxfield-list-items">
+                        {% for carta in grupo.cartas %}
+                        <li class="moxfield-list-row tarjeta-carta-mazo {% if not carta.es_legal %}carta-fuera-norma{% endif %}" data-carta-id="{{ carta['id'] }}">
+                            <span class="list-qty"><span class="valor-cantidad">{{ carta['cantidad'] }}</span>x</span>
+                            <a href="{{ url_for('carta_detalle', carta_id=carta['id']) }}" class="list-card-name" title="{{ carta.aviso_legalidad or carta['nombre'] }}">
+                                {{ carta['nombre'] }}
+                                {% if not carta.es_legal %}
+                                    <span class="list-warn-badge" title="{{ carta.aviso_legalidad }}">⚠️</span>
+                                {% endif %}
+                            </a>
+                            <span class="list-mana">{{ carta['coste_mana'] | simbolos_mana }}</span>
+                            <span class="list-row-actions">
+                                <button type="button" class="btn-secundario btn-xs" data-accion="restar" title="Quitar 1">−</button>
+                                <button type="button" class="btn-secundario btn-xs" data-accion="anadir" title="Añadir 1">+</button>
+                                <button type="button" class="btn-secundario btn-xs" data-accion="alter" title="Elegir Alter Oficial HD">🎨</button>
+                                {% if es_commander %}
+                                    <button type="button" class="btn-secundario btn-xs" data-accion="comandante" title="Hacer Comandante">👑</button>
+                                {% endif %}
+                                <button type="button" class="btn-eliminar btn-xs" data-accion="quitar" title="Eliminar">×</button>
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div id="mazo-vacio" class="estado-vacio {% if cartas %}hidden{% endif %}">
+            <h3>La biblioteca ({{ objetivo_biblioteca }} cartas) está vacía</h3>
+            <p>Usa la barra «⚡ Añadir carta rápida» de arriba o explora el catálogo para construir tu mazo de <strong>{{ reglas_formato.id }}</strong>.</p>
+            <a href="{{ url_for('index') }}" class="btn">Explorar catálogo de cartas</a>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const MAZO_ID = {{ mazo['id'] | tojson }};
+    const USA_COMANDANTE = {{ es_commander | tojson }};
+    const OBJETIVO_BIBLIOTECA = {{ objetivo_biblioteca | tojson }};
+    const mensaje = document.getElementById('mensaje-mazo');
+
+    // Selector rápido para cambiar el formato del mazo
+    const selectFormato = document.getElementById('select-cambiar-formato');
+    if (selectFormato) {
+        selectFormato.addEventListener('change', async () => {
+            try {
+                await enviarJSON(`/api/mazos/${MAZO_ID}/formato`, { formato: selectFormato.value });
+                window.location.reload();
+            } catch (err) {
+                mensaje.textContent = `Error: ${err.message}`;
+            }
+        });
+    }
+
+    // Selector y botones de Bracket (1 al 5)
+    async function fijarBracket(valor) {
+        try {
+            await enviarJSON(`/api/mazos/${MAZO_ID}/bracket`, { bracket_objetivo: Number(valor) });
+            window.location.reload();
+        } catch (err) {
+            mensaje.textContent = `Error: ${err.message}`;
+        }
+    }
+
+    const selectBracket = document.getElementById('select-cambiar-bracket');
+    if (selectBracket) {
+        selectBracket.addEventListener('change', () => fijarBracket(selectBracket.value));
+    }
+
+    document.querySelectorAll('.bracket-step[data-bracket]').forEach(btn => {
+        btn.addEventListener('click', () => fijarBracket(btn.dataset.bracket));
+    });
+
+    async function fijarComandante(cartaId) {
+        try {
+            await enviarJSON(`/api/mazos/${MAZO_ID}/comandante`, { carta_id: cartaId });
+            window.location.reload();
+        } catch (err) {
+            mensaje.textContent = `Error: ${err.message}`;
+        }
+    }
+
+    async function anadirCartaRapida(cartaId) {
+        try {
+            await enviarJSON(`/api/mazos/${MAZO_ID}/anadir`, { carta_id: cartaId, cantidad: 1 });
+            window.location.reload();
+        } catch (err) {
+            mensaje.textContent = `Error: ${err.message}`;
+        }
+    }
+
+    // Cambiar entre Vista Visual y Vista Lista Moxfield
+    const btnVisual = document.getElementById('btn-vista-visual');
+    const btnLista = document.getElementById('btn-vista-lista');
+    const contVisual = document.getElementById('contenedor-vista-visual');
+    const contLista = document.getElementById('contenedor-vista-lista');
+
+    if (btnVisual && btnLista && contVisual && contLista) {
+        btnVisual.addEventListener('click', () => {
+            btnVisual.classList.add('active');
+            btnLista.classList.remove('active');
+            contVisual.classList.remove('hidden');
+            contLista.classList.add('hidden');
+        });
+        btnLista.addEventListener('click', () => {
+            btnLista.classList.add('active');
+            btnVisual.classList.remove('active');
+            contLista.classList.remove('hidden');
+            contVisual.classList.add('hidden');
+        });
+    }
+
+    // Botones de Comandante (Alter HD / Cambiar / Quitar)
+    const btnAlterCmd = document.getElementById('btn-alter-cmd');
+    const btnCambiarCmd = document.getElementById('btn-cambiar-cmd');
+    const btnQuitarCmd = document.getElementById('btn-quitar-cmd');
+    const cajaBuscarCmd = document.getElementById('caja-buscar-cmd');
+
+    if (btnAlterCmd) {
+        btnAlterCmd.addEventListener('click', () => {
+            abrirSelectorAlters({
+                cartaId: btnAlterCmd.dataset.cartaId,
+                nombreCarta: btnAlterCmd.dataset.cartaNombre,
+                mazoId: MAZO_ID,
+                esComandante: true,
+                modo: 'cambiar_en_mazo',
+            });
+        });
+    }
+    if (btnCambiarCmd && cajaBuscarCmd) {
+        btnCambiarCmd.addEventListener('click', () => {
+            cajaBuscarCmd.classList.toggle('hidden');
+            document.getElementById('input-cmd-inline').focus();
+        });
+    }
+    if (btnQuitarCmd) {
+        btnQuitarCmd.addEventListener('click', () => fijarComandante(null));
+    }
+
+    // Buscador inline de Comandante
+    const inputCmdInline = document.getElementById('input-cmd-inline');
+    const dropCmdInline = document.getElementById('dropdown-cmd-inline');
+    let timerCmd = null;
+
+    if (inputCmdInline) {
+        inputCmdInline.addEventListener('input', () => {
+            clearTimeout(timerCmd);
+            const q = inputCmdInline.value.trim();
+            if (q.length < 2) {
+                dropCmdInline.classList.add('hidden');
+                return;
+            }
+            timerCmd = setTimeout(async () => {
+                const resp = await fetch(`/api/cartas/autocompletar?comandante=1&q=${encodeURIComponent(q)}`);
+                const data = await resp.json();
+                dropCmdInline.replaceChildren();
+                if (!data.cartas || data.cartas.length === 0) {
+                    dropCmdInline.classList.add('hidden');
+                    return;
+                }
+                data.cartas.forEach(c => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'autocompletar-item';
+                    const nombre = document.createElement('strong');
+                    nombre.textContent = `👑 ${c.nombre}`;
+                    const meta = document.createElement('span');
+                    meta.textContent = `${c.tipo} · ${c.coste_mana}`;
+                    item.appendChild(nombre);
+                    item.appendChild(meta);
+                    item.addEventListener('click', () => fijarComandante(c.id));
+                    dropCmdInline.appendChild(item);
+                });
+                dropCmdInline.classList.remove('hidden');
+            }, 180);
+        });
+    }
+
+    // Barra rápida de añadir carta (Quick-Add estilo Moxfield)
+    const inputQuick = document.getElementById('input-quick-add');
+    const dropQuick = document.getElementById('dropdown-quick-add');
+    let timerQuick = null;
+
+    inputQuick.addEventListener('input', () => {
+        clearTimeout(timerQuick);
+        const q = inputQuick.value.trim();
+        if (q.length < 2) {
+            dropQuick.classList.add('hidden');
+            return;
+        }
+        timerQuick = setTimeout(async () => {
+            const resp = await fetch(`/api/cartas/autocompletar?q=${encodeURIComponent(q)}`);
+            const data = await resp.json();
+            dropQuick.replaceChildren();
+            if (!data.cartas || data.cartas.length === 0) {
+                dropQuick.classList.add('hidden');
+                return;
+            }
+            data.cartas.forEach(c => {
+                const fila = document.createElement('div');
+                fila.className = 'autocompletar-item autocompletar-item-acciones';
+
+                const info = document.createElement('div');
+                const nombre = document.createElement('strong');
+                nombre.textContent = c.nombre;
+                const meta = document.createElement('span');
+                meta.textContent = ` · ${c.tipo} ${c.coste_mana}`;
+                info.appendChild(nombre);
+                info.appendChild(meta);
+
+                const acciones = document.createElement('div');
+                acciones.className = 'acciones-busqueda';
+
+                const btnElegirArte = document.createElement('button');
+                btnElegirArte.type = 'button';
+                btnElegirArte.className = 'btn btn-secundario btn-sm';
+                btnElegirArte.textContent = '🎨 Elegir Alter';
+                btnElegirArte.title = 'Elegir el Alter Oficial HD antes de añadir al mazo';
+                btnElegirArte.addEventListener('click', () => {
+                    dropQuick.classList.add('hidden');
+                    abrirSelectorAlters({
+                        cartaId: c.id,
+                        nombreCarta: c.nombre,
+                        mazoId: MAZO_ID,
+                        esComandante: false,
+                        modo: 'anadir_mazo',
+                    });
+                });
+                acciones.appendChild(btnElegirArte);
+
+                const btnAdd = document.createElement('button');
+                btnAdd.type = 'button';
+                btnAdd.className = 'btn btn-sm';
+                btnAdd.textContent = USA_COMANDANTE ? `+ A las ${OBJETIVO_BIBLIOTECA}` : '+ Añadir';
+                btnAdd.addEventListener('click', () => anadirCartaRapida(c.id));
+                acciones.appendChild(btnAdd);
+
+                if (USA_COMANDANTE) {
+                    const btnCmd = document.createElement('button');
+                    btnCmd.type = 'button';
+                    btnCmd.className = 'btn btn-secundario btn-sm';
+                    btnCmd.textContent = '👑 Comandante';
+                    btnCmd.addEventListener('click', () => fijarComandante(c.id));
+                    acciones.appendChild(btnCmd);
+                }
+
+                fila.appendChild(info);
+                fila.appendChild(acciones);
+                dropQuick.appendChild(fila);
+            });
+            dropQuick.classList.remove('hidden');
+        }, 180);
+    });
+
+    // Acciones en las cartas de la biblioteca (+, −, 🎨, 👑, ×)
+    document.getElementById('grid-mazo').addEventListener('click', async (evento) => {
+        const boton = evento.target.closest('button[data-accion]');
+        if (!boton) return;
+
+        const tarjeta = boton.closest('.tarjeta-carta-mazo');
+        const cartaId = tarjeta.dataset.cartaId;
+        const accion = boton.dataset.accion;
+        mensaje.textContent = '';
+
+        if (accion === 'alter') {
+            const nombreEl = tarjeta.querySelector('.nombre-carta, .list-card-name');
+            abrirSelectorAlters({
+                cartaId,
+                nombreCarta: nombreEl ? nombreEl.textContent.trim() : '',
+                mazoId: MAZO_ID,
+                esComandante: false,
+                modo: 'cambiar_en_mazo',
+            });
+            return;
+        }
+
+        if (accion === 'comandante') {
+            await fijarComandante(cartaId);
+            return;
+        }
+
+        const cuerpo = { carta_id: cartaId };
+        if (accion !== 'quitar') cuerpo.cantidad = 1;
+
+        try {
+            await enviarJSON(`/api/mazos/${MAZO_ID}/${accion}`, cuerpo);
+            window.location.reload();
+        } catch (error) {
+            mensaje.textContent = `Error: ${error.message}`;
+        }
+    });
+})();
+</script>
+{% endblock %}

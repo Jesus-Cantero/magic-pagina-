@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta · {{ usuario['nombre'] }} · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="cabecera-mazo">
+    <div class="perfil-cabecera">
+        {% if usuario['avatar_url'] %}
+            <img src="{{ usuario['avatar_url'] }}" alt="{{ usuario['nombre'] }}" class="perfil-avatar">
+        {% else %}
+            <div class="perfil-avatar perfil-inicial">{{ usuario['nombre'][0] | upper }}</div>
+        {% endif %}
+        <div>
+            <div class="mazo-badges">
+                {% if usuario['google_id'] %}
+                    <span class="badge-formato">Cuenta vinculada con Google</span>
+                {% else %}
+                    <span class="badge-formato">Cuenta de correo</span>
+                {% endif %}
+                {% if usuario['creado_en'] %}
+                    <span class="mazo-fecha">Miembro desde {{ usuario['creado_en'][:10] }}</span>
+                {% endif %}
+            </div>
+            <h1>{{ usuario['nombre'] }}</h1>
+            <p class="texto-suave">{{ usuario['email'] }}</p>
+        </div>
+    </div>
+
+    <div class="estadisticas-mazo">
+        <div class="stat-box">
+            <span class="stat-valor">{{ mazos | length }}</span>
+            <span class="stat-label">Mazos</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-valor">{{ mazos | sum(attribute='total_cartas') }}</span>
+            <span class="stat-label">Cartas en mazos</span>
+        </div>
+    </div>
+</div>
+
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Colección de {{ usuario['nombre'] }}</span>
+        <h2>Tus mazos recientes</h2>
+    </div>
+    <a href="{{ url_for('listar_mazos') }}" class="btn btn-sm">+ Gestionar mazos</a>
+</div>
+
+<div class="lista-mazos">
+    {% for mazo in mazos %}
+    <div class="tarjeta-mazo">
+        <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="tarjeta-mazo-cuerpo">
+            <div class="tarjeta-mazo-top">
+                <span class="badge-formato">{{ mazo['formato'] or 'Casual' }}</span>
+                <span class="cantidad">{{ mazo['total_cartas'] }} carta(s)</span>
+            </div>
+            <h3>{{ mazo['nombre'] }}</h3>
+        </a>
+        <div class="tarjeta-mazo-pie">
+            <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">Abrir constructor</a>
+        </div>
+    </div>
+    {% else %}
+        <div class="estado-vacio">
+            <h3>Todavía no tienes mazos</h3>
+            <p>Crea tu primer mazo para empezar a guardar cartas en tu cuenta.</p>
+            <a href="{{ url_for('listar_mazos') }}" class="btn">Crear un mazo</a>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
