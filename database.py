@@ -402,7 +402,7 @@ def restaurar_estado_persistente():
 
 # ---------- Cartas ----------
 
-def buscar_cartas(texto="", tipo="", color="", pagina=1, por_pagina=24, orden="nombre", solo_spoilers=False):
+def buscar_cartas(texto="", tipo="", color="", pagina=1, por_pagina=24, orden="nombre", solo_spoilers=False, edicion=""):
     condiciones = []
     parametros = []
 
@@ -419,6 +419,9 @@ def buscar_cartas(texto="", tipo="", color="", pagina=1, por_pagina=24, orden="n
         else:
             condiciones.append("colores LIKE ?")
             parametros.append(f"%{color}%")
+    if edicion:
+        condiciones.append("lower(set_code) = lower(?)")
+        parametros.append(edicion.strip())
     if solo_spoilers:
         condiciones.append("es_spoiler = 1")
 
@@ -438,6 +441,46 @@ def buscar_cartas(texto="", tipo="", color="", pagina=1, por_pagina=24, orden="n
             parametros + [por_pagina, offset]
         ).fetchall()
     return filas, total
+
+
+def listar_ediciones():
+    """
+    Devuelve todas las ediciones de Magic ordenadas cronológicamente desde la más
+    reciente hasta Alpha (1993), situando como última edición en cabeza el spoiler
+    de Star Trek (TRK / TRC / SDS - 2026-11-13).
+    """
+    codigos_posteriores_star_trek = ("mdd", "mdc", "tmdd", "pf27", "pmei", "slp", "pw26", "prm")
+    placeholders = ",".join("?" for _ in codigos_posteriores_star_trek)
+    with conexion() as conn:
+        filas = conn.execute(
+            f"""
+            SELECT lower(set_code) AS set_code,
+                   MAX(set_nombre) AS set_nombre,
+                   CASE
+                       WHEN lower(set_code) IN ('trk', 'trc', 'sds') THEN '2026-11-13'
+                       WHEN lower(set_code) = 'sld' THEN '2026-11-01'
+                       ELSE COALESCE(MAX(fecha_lanzamiento), '1993-01-01')
+                   END AS fecha,
+                   MAX(es_spoiler) AS es_spoiler,
+                   COUNT(*) AS total_cartas
+            FROM cartas
+            WHERE set_code IS NOT NULL
+              AND set_code != ''
+              AND lower(set_code) NOT IN ({placeholders})
+            GROUP BY lower(set_code)
+            ORDER BY
+                CASE WHEN lower(set_code) = 'trk' THEN 0
+                     WHEN lower(set_code) = 'trc' THEN 1
+                     WHEN lower(set_code) = 'sds' THEN 2
+                     ELSE 3
+                END ASC,
+                fecha DESC,
+                total_cartas DESC,
+                set_nombre ASC
+            """,
+            codigos_posteriores_star_trek,
+        ).fetchall()
+    return [dict(r) for r in filas]
 
 
 def actualizar_imagen_carta(carta_id, imagen_url):

@@ -5,10 +5,18 @@
 <div class="page-header">
     <div>
         <span class="eyebrow">Base de datos Oracle HD · Actualizada con Spoilers</span>
-        <h1>{% if solo_spoilers %}🔥 Spoilers y Próximos Lanzamientos{% else %}Explorar cartas{% endif %}</h1>
+        <h1>
+            {% if edicion_actual %}
+                📦 {{ edicion_actual['set_nombre'] }} <span class="badge-set">{{ edicion_actual['set_code'] | upper }}</span>
+            {% elif solo_spoilers %}
+                🔥 Spoilers y Próximos Lanzamientos
+            {% else %}
+                Explorar cartas
+            {% endif %}
+        </h1>
     </div>
     <div class="resultados-info acciones-busqueda">
-        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, spoilers=None if solo_spoilers else '1', orden='recientes') }}"
+        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, edicion=edicion or None, spoilers=None if solo_spoilers else '1', orden='recientes') }}"
            class="btn btn-sm {% if solo_spoilers %}btn-primario{% else %}btn-secundario{% endif %}">
             🔥 {% if solo_spoilers %}Viendo Spoilers (Ver todo){% else %}Ver Spoilers & Novedades{% endif %}
         </a>
@@ -22,6 +30,7 @@
     </div>
 </div>
 
+<!-- FORMULARIO PRINCIPAL DE BÚSQUEDA DE CARTAS -->
 <form method="get" class="form-busqueda">
     {% if solo_spoilers %}
         <input type="hidden" name="spoilers" value="1">
@@ -29,6 +38,27 @@
     <div class="campo-filtro campo-principal">
         <label for="filtro-q">Nombre, texto de reglas o expansión</label>
         <input type="text" id="filtro-q" name="q" placeholder="Ej. Cloud, Star Trek, Demonic Consultation, Draw a card..." value="{{ texto }}">
+    </div>
+
+    <div class="campo-filtro">
+        <label for="filtro-edicion">Edición / Expansión</label>
+        <select id="filtro-edicion" name="edicion">
+            <option value="">📦 Todas las ediciones ({{ ediciones|length }})</option>
+            <optgroup label="🔥 Últimos Spoilers (Hasta Star Trek)">
+                {% for ed in ediciones if ed['es_spoiler'] %}
+                <option value="{{ ed['set_code'] }}" {% if edicion == ed['set_code'] %}selected{% endif %}>
+                    [{{ ed['set_code'] | upper }}] {{ ed['set_nombre'] }} ({{ ed['total_cartas'] }} cartas){% if ed['set_code'] in ('trk', 'trc') %} · 🖖 SPOILER{% endif %}
+                </option>
+                {% endfor %}
+            </optgroup>
+            <optgroup label="📚 Historial de Ediciones (Orden Cronológico)">
+                {% for ed in ediciones if not ed['es_spoiler'] %}
+                <option value="{{ ed['set_code'] }}" {% if edicion == ed['set_code'] %}selected{% endif %}>
+                    [{{ ed['set_code'] | upper }}] {{ ed['set_nombre'] }} · {{ (ed['fecha'] or '')[:4] }} ({{ ed['total_cartas'] }})
+                </option>
+                {% endfor %}
+            </optgroup>
+        </select>
     </div>
 
     <div class="campo-filtro">
@@ -59,11 +89,93 @@
 
     <div class="acciones-busqueda">
         <button type="submit">Filtrar</button>
-        {% if texto or tipo or color or solo_spoilers or orden == 'recientes' %}
+        {% if texto or tipo or color or edicion or solo_spoilers or orden == 'recientes' %}
             <a href="{{ url_for('index') }}" class="btn btn-secundario">Limpiar</a>
         {% endif %}
     </div>
 </form>
+
+<!-- SUBAPARTADO: BUSCADOR DE CARTAS POR EDICIONES (HASTA EL ÚLTIMO SPOILER DE STAR TREK) -->
+<section class="subapartado-ediciones" aria-label="Buscador por ediciones">
+    <div class="ediciones-top-bar">
+        <div>
+            <span class="eyebrow">Cronología Oficial MTG · Desde Alpha (1993) hasta el último Spoiler de Star Trek</span>
+            <h2>📦 Explorar Cartas por Edición ({{ ediciones|length }} ediciones)</h2>
+        </div>
+        <div class="ediciones-controles-rapidos">
+            <input type="search" id="input-filtrar-ediciones" placeholder="🔍 Buscar edición (ej. Star Trek, Final Fantasy, Hobbit, Ravnica, MH3)..." autocomplete="off">
+            <button type="button" class="btn btn-secundario btn-sm" id="btn-toggle-todas-ediciones">
+                Ver catálogo completo de ediciones ▾
+            </button>
+        </div>
+    </div>
+
+    <!-- Accesos rápidos a las últimas ediciones y spoilers encabezados por Star Trek -->
+    <div class="ediciones-chips-destacadas">
+        <a href="{{ url_for('index') }}" class="edicion-chip {% if not edicion %}active{% endif %}">
+            <span>🌐 Todas</span>
+        </a>
+        {% for ed in ediciones[:12] %}
+        <a href="{{ url_for('index', edicion=ed['set_code'], orden='nombre') }}"
+           class="edicion-chip {% if edicion == ed['set_code'] %}active{% endif %} {% if ed['es_spoiler'] %}es-spoiler{% endif %}">
+            <span class="edicion-chip-code">{{ ed['set_code'] | upper }}</span>
+            <span class="edicion-chip-name">{{ ed['set_nombre'] }}</span>
+            <span class="edicion-chip-count">{{ ed['total_cartas'] }}</span>
+            {% if ed['set_code'] in ('trk', 'trc', 'sds') %}
+                <span class="edicion-chip-tag">🖖 ÚLTIMO SPOILER</span>
+            {% elif ed['es_spoiler'] %}
+                <span class="edicion-chip-tag">🔥 SPOILER</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Panel desplegable con el buscador interactivo de todas las ediciones -->
+    <div id="panel-catalogo-ediciones" class="ediciones-catalogo-panel hidden">
+        <div class="ediciones-filtros-tabs">
+            <button type="button" class="btn-secundario btn-xs edicion-tab-btn active" data-filtro="todas">Todas ({{ ediciones|length }})</button>
+            <button type="button" class="btn-secundario btn-xs edicion-tab-btn" data-filtro="spoilers">🔥 Spoilers hasta Star Trek</button>
+            <button type="button" class="btn-secundario btn-xs edicion-tab-btn" data-filtro="principales">⚔️ Expansiones Grandes (+80 cartas)</button>
+        </div>
+        <div class="ediciones-grid-lista" id="grid-lista-ediciones">
+            {% for ed in ediciones %}
+            <a href="{{ url_for('index', edicion=ed['set_code'], orden='nombre') }}"
+               class="edicion-card-item {% if edicion == ed['set_code'] %}active{% endif %} {% if ed['es_spoiler'] %}edicion-es-spoiler{% endif %}"
+               data-nombre="{{ (ed['set_nombre'] ~ ' ' ~ ed['set_code'] ~ ' ' ~ (ed['fecha'] or '')) | lower }}"
+               data-spoiler="{{ '1' if ed['es_spoiler'] else '0' }}"
+               data-total="{{ ed['total_cartas'] }}">
+                <div class="edicion-card-top">
+                    <span class="badge-set">{{ ed['set_code'] | upper }}</span>
+                    {% if ed['set_code'] in ('trk', 'trc', 'sds') %}
+                        <span class="edicion-spoiler-pill">🖖 SPOILER STAR TREK</span>
+                    {% elif ed['es_spoiler'] %}
+                        <span class="edicion-spoiler-pill">🔥 SPOILER</span>
+                    {% else %}
+                        <span class="edicion-fecha-pill">{{ (ed['fecha'] or '')[:4] }}</span>
+                    {% endif %}
+                </div>
+                <strong class="edicion-card-titulo">{{ ed['set_nombre'] }}</strong>
+                <span class="edicion-card-meta">{{ ed['total_cartas'] }} carta(s) · {{ ed['fecha'] or 'Clásica' }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if edicion_actual %}
+    <div class="edicion-activa-banner">
+        <div>
+            <strong>📦 Viendo edición: {{ edicion_actual['set_nombre'] }} ({{ edicion_actual['set_code'] | upper }})</strong>
+            <span> · {{ total }} carta(s) encontrada(s) · Fecha: {{ edicion_actual['fecha'] or 'Clásica' }}</span>
+            {% if edicion_actual['es_spoiler'] %}
+                <span class="edicion-spoiler-pill">🔥 SPOILER OFICIAL</span>
+            {% endif %}
+        </div>
+        <a href="{{ url_for('index', q=texto or None, tipo=tipo or None, color=color or None) }}" class="btn btn-secundario btn-xs">
+            ✕ Quitar filtro de edición
+        </a>
+    </div>
+    {% endif %}
+</section>
 
 <p id="mensaje-catalogo" class="texto-suave hidden" role="status"></p>
 
@@ -92,7 +204,7 @@
             <div class="carta-fila-inferior">
                 <span class="tipo-carta" title="{{ carta['tipo'] }}">{{ carta['tipo'] }}</span>
                 {% if carta['set_code'] %}
-                    <span class="badge-set rareza-{{ carta['rareza'] or 'common' }}">{{ carta['set_code'] | upper }}</span>
+                    <a href="{{ url_for('index', edicion=carta['set_code']|lower) }}" class="badge-set rareza-{{ carta['rareza'] or 'common' }}" title="Ver toda la edición {{ carta['set_nombre'] }}">{{ carta['set_code'] | upper }}</a>
                 {% endif %}
             </div>
             <div class="carta-acciones-catalogo">
@@ -114,19 +226,19 @@
 {% if total_paginas > 1 %}
 <nav class="paginacion" aria-label="Paginación">
     {% if pagina > 1 %}
-        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina - 1) }}" aria-label="Página anterior">&laquo; Anterior</a>
+        <a href="{{ url_for('index', q=texto or None, tipo=tipo or None, color=color or None, edicion=edicion or None, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina - 1) }}" aria-label="Página anterior">&laquo; Anterior</a>
     {% endif %}
     {% for p in paginas %}
         {% if p is none %}
             <span class="puntos">…</span>
         {% else %}
-            <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=p) }}"
+            <a href="{{ url_for('index', q=texto or None, tipo=tipo or None, color=color or None, edicion=edicion or None, orden=orden, spoilers='1' if solo_spoilers else None, pagina=p) }}"
                class="{% if p == pagina %}activa{% endif %}"
                {% if p == pagina %}aria-current="page"{% endif %}>{{ p }}</a>
         {% endif %}
     {% endfor %}
     {% if pagina < total_paginas %}
-        <a href="{{ url_for('index', q=texto, tipo=tipo, color=color, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina + 1) }}" aria-label="Página siguiente">Siguiente &raquo;</a>
+        <a href="{{ url_for('index', q=texto or None, tipo=tipo or None, color=color or None, edicion=edicion or None, orden=orden, spoilers='1' if solo_spoilers else None, pagina=pagina + 1) }}" aria-label="Página siguiente">Siguiente &raquo;</a>
     {% endif %}
 </nav>
 {% endif %}
@@ -157,20 +269,82 @@
         });
     });
 
+    // Cambio directo del select de edición
+    const selectEdicion = document.getElementById('filtro-edicion');
+    if (selectEdicion) {
+        selectEdicion.addEventListener('change', () => {
+            selectEdicion.closest('form').submit();
+        });
+    }
+
+    // Buscador interactivo de ediciones
+    const inputEdiciones = document.getElementById('input-filtrar-ediciones');
+    const panelEdiciones = document.getElementById('panel-catalogo-ediciones');
+    const btnToggleEdiciones = document.getElementById('btn-toggle-todas-ediciones');
+    const itemsEdicion = Array.from(document.querySelectorAll('.edicion-card-item'));
+    const tabBtns = Array.from(document.querySelectorAll('.edicion-tab-btn'));
+    let filtroTabActual = 'todas';
+
+    function aplicarFiltroEdiciones() {
+        const q = (inputEdiciones ? inputEdiciones.value : '').trim().toLowerCase();
+        itemsEdicion.forEach((el) => {
+            const coincideTexto = !q || el.dataset.nombre.includes(q);
+            let coincideTab = true;
+            if (filtroTabActual === 'spoilers') {
+                coincideTab = el.dataset.spoiler === '1';
+            } else if (filtroTabActual === 'principales') {
+                coincideTab = parseInt(el.dataset.total || '0', 10) >= 80;
+            }
+            el.classList.toggle('hidden', !(coincideTexto && coincideTab));
+        });
+    }
+
+    if (btnToggleEdiciones && panelEdiciones) {
+        btnToggleEdiciones.addEventListener('click', () => {
+            const oculto = panelEdiciones.classList.toggle('hidden');
+            btnToggleEdiciones.textContent = oculto
+                ? 'Ver catálogo completo de ediciones ▾'
+                : 'Ocultar catálogo de ediciones ▴';
+        });
+    }
+
+    if (inputEdiciones && panelEdiciones) {
+        inputEdiciones.addEventListener('input', () => {
+            if (panelEdiciones.classList.contains('hidden')) {
+                panelEdiciones.classList.remove('hidden');
+                if (btnToggleEdiciones) btnToggleEdiciones.textContent = 'Ocultar catálogo de ediciones ▴';
+            }
+            aplicarFiltroEdiciones();
+        });
+    }
+
+    tabBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            filtroTabActual = btn.dataset.filtro || 'todas';
+            aplicarFiltroEdiciones();
+        });
+    });
+
     const btnSync = document.getElementById('btn-sync-spoilers');
-    const msg = document.getElementById('mensaje-catalogo');
+    const msgEl = document.getElementById('mensaje-catalogo');
     if (btnSync) {
         btnSync.addEventListener('click', async () => {
             btnSync.disabled = true;
-            btnSync.textContent = '⏳ Sincronizando Spoilers con Scryfall...';
-            msg.classList.remove('hidden');
-            msg.textContent = 'Descargando las cartas y spoilers más recientes en calidad HD desde Scryfall...';
+            btnSync.textContent = '⏳ Sincronizando con Scryfall...';
             try {
-                const res = await enviarJSON('/api/cartas/sincronizar_spoilers', {});
-                msg.textContent = `✓ ¡Catálogo actualizado! ${res.actualizadas} cartas/spoilers sincronizadas en alta calidad.`;
-                setTimeout(() => window.location.reload(), 700);
+                const res = await peticionJSON('/api/spoilers/sincronizar', {});
+                if (msgEl) {
+                    msgEl.textContent = `¡Sincronización completada! ${res.sincronizadas} cartas spoiler actualizadas en calidad HD. Recargando...`;
+                    msgEl.className = 'mensaje-ok';
+                }
+                setTimeout(() => window.location.reload(), 900);
             } catch (err) {
-                msg.textContent = `Error: ${err.message}`;
+                if (msgEl) {
+                    msgEl.textContent = err.message;
+                    msgEl.className = 'mensaje-error';
+                }
                 btnSync.disabled = false;
                 btnSync.textContent = '🔄 Sincronizar Spoilers de Hoy';
             }

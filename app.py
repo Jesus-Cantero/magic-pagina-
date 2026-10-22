@@ -886,6 +886,7 @@ def index():
     color = request.args.get("color", "")
     if color not in ("", "W", "U", "B", "R", "G", "C"):
         color = ""
+    edicion = (request.args.get("edicion") or request.args.get("set") or "").strip().lower()
     solo_spoilers = request.args.get("spoilers") == "1"
     orden = request.args.get("orden", "").strip()
     if orden not in ("nombre", "recientes"):
@@ -897,18 +898,22 @@ def index():
     if estado != "ok":
         flash(MENSAJES_ESTADO_BD[estado])
         return render_template("index.html", cartas=[], total=0, texto=texto, tipo=tipo, color=color,
+                               edicion="", edicion_actual=None, ediciones=[],
                                orden=orden, solo_spoilers=solo_spoilers, mazos=[],
                                pagina=1, total_paginas=1, paginas=[])
 
+    ediciones = db.listar_ediciones()
+    edicion_actual = next((e for e in ediciones if e["set_code"] == edicion), None) if edicion else None
+
     pagina = max(1, pagina)
     cartas, total = db.buscar_cartas(
-        texto, tipo, color, pagina, POR_PAGINA, orden=orden, solo_spoilers=solo_spoilers
+        texto, tipo, color, pagina, POR_PAGINA, orden=orden, solo_spoilers=solo_spoilers, edicion=edicion
     )
     total_paginas = max(1, (total + POR_PAGINA - 1) // POR_PAGINA)
 
     # Si piden una página que no existe, redirigimos a la última
     if pagina > total_paginas:
-        return redirect(url_for("index", q=texto, tipo=tipo, color=color,
+        return redirect(url_for("index", q=texto, tipo=tipo, color=color, edicion=edicion or None,
                                 orden=orden, spoilers="1" if solo_spoilers else None, pagina=total_paginas))
 
     usuario = obtener_usuario_actual()
@@ -920,6 +925,9 @@ def index():
         texto=texto,
         tipo=tipo,
         color=color,
+        edicion=edicion,
+        edicion_actual=edicion_actual,
+        ediciones=ediciones,
         orden=orden,
         solo_spoilers=solo_spoilers,
         mazos=mazos,
