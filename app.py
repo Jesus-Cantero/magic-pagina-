@@ -1743,7 +1743,7 @@ def api_listar_alters_carta(carta_id):
             uris = (imp["card_faces"][0] or {}).get("image_uris")
         if not uris:
             continue
-        img_hd = uris.get("large") or uris.get("png") or uris.get("normal")
+        img_hd = db.url_imagen_4k(uris.get("png") or uris.get("large") or uris.get("normal"))
         img_png = uris.get("png") or img_hd
         if not img_hd or img_hd in urls_vistas:
             continue
@@ -1892,10 +1892,10 @@ def transformar_combo_spellbook(combo, nombres_en_mazo):
         c = uso.get("card") or {}
         nombre = c.get("name") or ""
         local = db.obtener_carta_por_nombre(nombre)
-        img = (
+        img = db.url_imagen_4k(
             (local["imagen_url"] if local and local["imagen_url"] else None)
-            or c.get("imageUriFrontNormal")
             or c.get("imageUriFrontLarge")
+            or c.get("imageUriFrontNormal")
             or ""
         )
         en_mazo = nombre.lower() in nombres_en_mazo

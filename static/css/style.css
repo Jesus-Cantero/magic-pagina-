@@ -4730,3 +4730,26 @@ html, body {
     }
 }
 
+/* =====================================================
+   RENDERIZADO DE CARTAS EN CALIDAD 4K ULTRA-HD (LOSSLESS PNG + FILTRO UNSHARP)
+   ===================================================== */
+
+.imagen-carta img,
+.carta-visual img,
+#img-ficha-principal,
+.ug-card-img,
+.ug-lightbox-card-wrap img,
+.ug-drawer-card-thumb img,
+.binder-mini-pocket img,
+.alter-thumb-btn img,
+.modal-alter-card img,
+.combo-carta-item img {
+    filter: url(#mtg-4k-uhd) contrast(1.03) saturate(1.04);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: high-quality;
+}
+
+

@@ -162,6 +162,24 @@ def tabla_existe(conn, nombre):
     return fila is not None
 
 
+def url_imagen_4k(url):
+    """
+    Convierte cualquier URL de Scryfall (small/normal/large .jpg) a su versión
+    Master PNG sin pérdida (4K Ultra-HD ready, sin artefactos de compresión JPEG
+    y con esquinas transparentes).
+    """
+    if not url or not isinstance(url, str):
+        return url
+    if "cards.scryfall.io" in url:
+        url = (
+            url.replace("/small/", "/png/")
+            .replace("/normal/", "/png/")
+            .replace("/large/", "/png/")
+            .replace(".jpg", ".png")
+        )
+    return url
+
+
 def asegurar_esquema_usuarios(conn):
     """
     Asegura que la tabla `usuarios` y la columna `mazos.usuario_id` existan
@@ -184,6 +202,16 @@ def asegurar_esquema_usuarios(conn):
             conn.execute("ALTER TABLE cartas ADD COLUMN fecha_lanzamiento TEXT")
         if "es_spoiler" not in col_cartas:
             conn.execute("ALTER TABLE cartas ADD COLUMN es_spoiler INTEGER DEFAULT 0")
+        # Actualizar todas las cartas a calidad Master Lossless PNG (4K Ultra-HD)
+        hay_jpg = conn.execute(
+            "SELECT 1 FROM cartas WHERE imagen_url LIKE '%/large/%' OR imagen_url LIKE '%/normal/%' LIMIT 1"
+        ).fetchone()
+        if hay_jpg:
+            conn.execute("""
+                UPDATE cartas
+                SET imagen_url = REPLACE(REPLACE(REPLACE(REPLACE(imagen_url, '/small/', '/png/'), '/normal/', '/png/'), '/large/', '/png/'), '.jpg', '.png')
+                WHERE imagen_url LIKE '%cards.scryfall.io%'
+            """)
     if tabla_existe(conn, "mazos"):
         columnas = [f[1] for f in conn.execute("PRAGMA table_info(mazos)").fetchall()]
         if "usuario_id" not in columnas:
@@ -195,10 +223,20 @@ def asegurar_esquema_usuarios(conn):
         if "comandante_imagen_personalizada" not in columnas:
             conn.execute("ALTER TABLE mazos ADD COLUMN comandante_imagen_personalizada TEXT")
         conn.execute("DELETE FROM mazos WHERE usuario_id IS NULL")
+        conn.execute("""
+            UPDATE mazos
+            SET comandante_imagen_personalizada = REPLACE(REPLACE(REPLACE(REPLACE(comandante_imagen_personalizada, '/small/', '/png/'), '/normal/', '/png/'), '/large/', '/png/'), '.jpg', '.png')
+            WHERE comandante_imagen_personalizada LIKE '%cards.scryfall.io%' AND comandante_imagen_personalizada LIKE '%.jpg%'
+        """)
     if tabla_existe(conn, "mazo_cartas"):
         col_mc = [f[1] for f in conn.execute("PRAGMA table_info(mazo_cartas)").fetchall()]
         if "imagen_personalizada" not in col_mc:
             conn.execute("ALTER TABLE mazo_cartas ADD COLUMN imagen_personalizada TEXT")
+        conn.execute("""
+            UPDATE mazo_cartas
+            SET imagen_personalizada = REPLACE(REPLACE(REPLACE(REPLACE(imagen_personalizada, '/small/', '/png/'), '/normal/', '/png/'), '/large/', '/png/'), '.jpg', '.png')
+            WHERE imagen_personalizada LIKE '%cards.scryfall.io%' AND imagen_personalizada LIKE '%.jpg%'
+        """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS albumes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,6 +264,11 @@ def asegurar_esquema_usuarios(conn):
             FOREIGN KEY (carta_id) REFERENCES cartas (id),
             UNIQUE (album_id, pagina, posicion)
         )
+    """)
+    conn.execute("""
+        UPDATE album_cartas
+        SET imagen_personalizada = REPLACE(REPLACE(REPLACE(REPLACE(imagen_personalizada, '/small/', '/png/'), '/normal/', '/png/'), '/large/', '/png/'), '.jpg', '.png')
+        WHERE imagen_personalizada LIKE '%cards.scryfall.io%' AND imagen_personalizada LIKE '%.jpg%'
     """)
     conn.commit()
 
@@ -585,6 +628,7 @@ def listar_ediciones():
 
 def actualizar_imagen_carta(carta_id, imagen_url):
     """Actualiza la imagen oficial por defecto de una carta en el catálogo."""
+    imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         conn.execute("UPDATE cartas SET imagen_url = ? WHERE id = ?", (imagen_url, carta_id))
         conn.commit()
@@ -731,6 +775,7 @@ def asignar_comandante(mazo_id, carta_id=None, imagen_url=None):
     Si esa misma carta estaba en la biblioteca de 99 cartas (mazo_cartas),
     la retira de las 99 para que el comandante quede separado.
     """
+    imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         conn.execute(
             "UPDATE mazos SET comandante_id = ?, comandante_imagen_personalizada = ? WHERE id = ?",
@@ -852,6 +897,7 @@ def anadir_carta_a_mazo(mazo_id, carta_id, cantidad=1, imagen_url=None):
     Permite opcionalmente especificar `imagen_url` (alter oficial elegido).
     Devuelve (cantidad_de_esa_carta, total_de_cartas_del_mazo).
     """
+    imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         conn.execute("""
             INSERT INTO mazo_cartas (mazo_id, carta_id, cantidad, imagen_personalizada)
@@ -869,6 +915,7 @@ def anadir_carta_a_mazo(mazo_id, carta_id, cantidad=1, imagen_url=None):
 
 def actualizar_imagen_carta_en_mazo(mazo_id, carta_id, imagen_url, es_comandante=False):
     """Cambia el arte/alter oficial de una carta específica dentro de un mazo o del comandante."""
+    imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         if es_comandante:
             conn.execute(
@@ -1096,6 +1143,7 @@ def colocar_carta_en_album(album_id, carta_id, pagina=None, posicion=None, image
     empezando en la página indicada (o página 1).
     Devuelve (pagina_asignada, posicion_asignada, total_cartas_album).
     """
+    imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         album = conn.execute("SELECT * FROM albumes WHERE id = ?", (album_id,)).fetchone()
         if not album:
@@ -1182,6 +1230,8 @@ def mover_carta_en_album(album_id, pagina_origen, pos_origen, pagina_destino, po
 
 
 def actualizar_bolsillo_album(album_id, pagina, posicion, imagen_url=None, acabado_foil=None):
+    if imagen_url is not None:
+        imagen_url = url_imagen_4k(imagen_url)
     with conexion() as conn:
         actual = conn.execute(
             "SELECT * FROM album_cartas WHERE album_id = ? AND pagina = ? AND posicion = ?",

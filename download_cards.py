@@ -127,14 +127,14 @@ def caras(carta):
 
 
 def extraer_imagen(carta):
-    # Preferimos "large" (alta resolución 672x936) o "png" (745x1040) sobre "normal".
+    # Preferimos "png" (máxima calidad Master Lossless 4K UHD sin compresión JPEG) sobre "large" o "normal".
     if "image_uris" in carta:
         uris = carta["image_uris"]
-        return uris.get("large") or uris.get("png") or uris.get("normal", "")
+        return uris.get("png") or uris.get("large") or uris.get("normal", "")
     for cara in caras(carta):
         if "image_uris" in cara:
             uris = cara["image_uris"]
-            return uris.get("large") or uris.get("png") or uris.get("normal", "")
+            return uris.get("png") or uris.get("large") or uris.get("normal", "")
     return ""
 
 
