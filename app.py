@@ -732,9 +732,12 @@ def obtener_usuario_actual():
 
 @app.context_processor
 def inyectar_contexto():
+    usuario = obtener_usuario_actual()
+    albumes_ctx = db.listar_albumes(usuario["id"] if usuario else None) if db.estado_bd() == "ok" else []
     return {
         "csrf_token": obtener_csrf_token,
-        "usuario_actual": obtener_usuario_actual(),
+        "usuario_actual": usuario,
+        "albumes_globales": albumes_ctx,
         "google_oauth_configurado": bool(
             os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")
         ),
@@ -1171,6 +1174,156 @@ def eliminar_mazo(mazo_id):
         db.eliminar_mazo(mazo_id)
         flash("Mazo eliminado.")
     return redirect(url_for("listar_mazos"))
+
+
+# ---------- Álbumes Físicos (Estilo Ultimate Guard QuadRow 12-Pocket / 9-Pocket / 4-Pocket) ----------
+
+@app.route("/albumes")
+@app.route("/albunes")
+def listar_albumes():
+    usuario = obtener_usuario_actual()
+    albumes = db.listar_albumes(usuario["id"] if usuario else None)
+    return render_template("albums.html", albumes=albumes)
+
+
+@app.route("/albumes/nuevo", methods=["POST"])
+def crear_album():
+    nombre = request.form.get("nombre", "").strip()
+    descripcion = request.form.get("descripcion", "").strip()
+    color_cubierta = request.form.get("color_cubierta", "negro").strip()
+    formato_hoja = request.form.get("formato_hoja", "4x3").strip()
+    if not nombre:
+        flash("El álbum necesita un nombre.")
+        return redirect(url_for("listar_albumes"))
+    if len(nombre) > 100:
+        flash("El nombre del álbum admite como máximo 100 caracteres.")
+        return redirect(url_for("listar_albumes"))
+
+    mapa_hoja = {
+        "4x3": (3, 4),  # 12 bolsillos QuadRow (Ultimate Guard)
+        "3x3": (3, 3),  # 9 bolsillos estándar
+        "2x2": (2, 2),  # 4 bolsillos compacto
+    }
+    filas, columnas = mapa_hoja.get(formato_hoja, (3, 4))
+    usuario = obtener_usuario_actual()
+    album_id = db.crear_album(
+        nombre=nombre,
+        descripcion=descripcion,
+        color_cubierta=color_cubierta,
+        filas=filas,
+        columnas=columnas,
+        usuario_id=usuario["id"] if usuario else None,
+    )
+    flash(f"Álbum físico «{nombre}» ({columnas}×{filas} · {filas * columnas} bolsillos por hoja) creado.")
+    return redirect(url_for("ver_album", album_id=album_id))
+
+
+@app.route("/albumes/<int:album_id>")
+def ver_album(album_id):
+    pagina = request.args.get("pagina", 1, type=int)
+    pagina = max(1, pagina)
+    album, bolsillos, total_paginas, total_cartas = db.obtener_album_pagina(album_id, pagina=pagina)
+    if album is None:
+        flash("No se encontró ese álbum.")
+        return redirect(url_for("listar_albumes"))
+    capacidad_hoja = int(album["filas"] or 3) * int(album["columnas"] or 4)
+    return render_template(
+        "album_detail.html",
+        album=album,
+        bolsillos=bolsillos,
+        pagina=pagina,
+        total_paginas=total_paginas,
+        total_cartas=total_cartas,
+        capacidad_hoja=capacidad_hoja,
+    )
+
+
+@app.route("/albumes/<int:album_id>/eliminar", methods=["POST"])
+def eliminar_album(album_id):
+    if db.obtener_album_simple(album_id) is None:
+        flash("No se encontró ese álbum.")
+    else:
+        db.eliminar_album(album_id)
+        flash("Álbum eliminado.")
+    return redirect(url_for("listar_albumes"))
+
+
+@app.route("/api/albumes/<int:album_id>/colocar", methods=["POST"])
+def api_colocar_en_album(album_id):
+    if db.obtener_album_simple(album_id) is None:
+        return error_api("Ese álbum no existe.", 404)
+    data = request.get_json(silent=True) or {}
+    carta_id = (data.get("carta_id") or "").strip()
+    if not carta_id or db.obtener_carta(carta_id) is None:
+        return error_api("Esa carta no existe.", 404)
+    pagina = data.get("pagina")
+    posicion = data.get("posicion")
+    imagen_url = (data.get("imagen_url") or data.get("imagen_custom") or "").strip() or None
+    if imagen_url and not imagen_url.startswith("https://cards.scryfall.io/"):
+        return error_api("La URL de la imagen debe pertenecer a Scryfall.")
+    acabado_foil = 1 if (data.get("acabado_foil") or data.get("es_foil")) else 0
+
+    pag_asig, pos_asig, total = db.colocar_carta_en_album(
+        album_id=album_id,
+        carta_id=carta_id,
+        pagina=pagina,
+        posicion=posicion,
+        imagen_url=imagen_url,
+        acabado_foil=acabado_foil,
+    )
+    return jsonify({"ok": True, "pagina": pag_asig, "posicion": pos_asig, "total": total})
+
+
+@app.route("/api/albumes/<int:album_id>/mover", methods=["POST"])
+def api_mover_en_album(album_id):
+    if db.obtener_album_simple(album_id) is None:
+        return error_api("Ese álbum no existe.", 404)
+    data = request.get_json(silent=True) or {}
+    try:
+        pag_orig = int(data.get("pagina_origen", 1))
+        pos_orig = int(data.get("pos_origen", 0))
+        pag_dest = int(data.get("pagina_destino", pag_orig))
+        pos_dest = int(data.get("pos_destino", 0))
+    except (TypeError, ValueError):
+        return error_api("Posiciones de bolsillo no válidas.")
+    ok = db.mover_carta_en_album(album_id, pag_orig, pos_orig, pag_dest, pos_dest)
+    if not ok:
+        return error_api("No había carta en el bolsillo de origen.")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/albumes/<int:album_id>/actualizar_bolsillo", methods=["POST"])
+def api_actualizar_bolsillo_album(album_id):
+    if db.obtener_album_simple(album_id) is None:
+        return error_api("Ese álbum no existe.", 404)
+    data = request.get_json(silent=True) or {}
+    try:
+        pagina = int(data.get("pagina", 1))
+        posicion = int(data.get("posicion", 0))
+    except (TypeError, ValueError):
+        return error_api("Bolsillo no válido.")
+    imagen_url = data.get("imagen_url")
+    if imagen_url and not str(imagen_url).startswith("https://cards.scryfall.io/"):
+        return error_api("La imagen debe pertenecer a Scryfall.")
+    acabado_foil = data.get("acabado_foil")
+    ok = db.actualizar_bolsillo_album(album_id, pagina, posicion, imagen_url=imagen_url, acabado_foil=acabado_foil)
+    if not ok:
+        return error_api("Bolsillo vacío.", 404)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/albumes/<int:album_id>/quitar", methods=["POST"])
+def api_quitar_de_album(album_id):
+    if db.obtener_album_simple(album_id) is None:
+        return error_api("Ese álbum no existe.", 404)
+    data = request.get_json(silent=True) or {}
+    try:
+        pagina = int(data.get("pagina", 1))
+        posicion = int(data.get("posicion", 0))
+    except (TypeError, ValueError):
+        return error_api("Bolsillo no válido.")
+    total = db.quitar_carta_de_album(album_id, pagina, posicion)
+    return jsonify({"ok": True, "total": total})
 
 
 # ---------- Autenticación: Registro, Login, Cuenta y Google OAuth ----------

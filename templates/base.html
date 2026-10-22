@@ -6,7 +6,7 @@
     <!-- Token CSRF: lo lee static/js/api.js para enviarlo en las peticiones fetch() -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Suso · MTG Deckbuilder & Card Search{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261022c">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261022d">
 </head>
 <body>
     <header class="navbar">
@@ -33,6 +33,10 @@
                     <a href="{{ url_for('listar_mazos') }}"
                        class="{% if request.endpoint in ('listar_mazos', 'ver_mazo') %}active{% endif %}">
                         Mis mazos
+                    </a>
+                    <a href="{{ url_for('listar_albumes') }}"
+                       class="{% if request.endpoint in ('listar_albumes', 'ver_album') %}active{% endif %}">
+                        📖 Álbumes
                     </a>
                     <a href="{{ url_for('combos') }}"
                        class="{% if request.endpoint == 'combos' %}active{% endif %}">
@@ -104,7 +108,14 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script>
+        window.ALBUMES_GLOBALES = [
+            {% for alb in albumes_globales %}
+                { id: {{ alb['id'] | tojson }}, nombre: {{ alb['nombre'] | tojson }} },
+            {% endfor %}
+        ];
+    </script>
+    <script src="{{ url_for('static', filename='js/api.js') }}?v=20261022d"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

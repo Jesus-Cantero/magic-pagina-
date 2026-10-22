@@ -91,6 +91,32 @@ CREATE TABLE IF NOT EXISTS mazo_cartas (
     UNIQUE (mazo_id, carta_id)
 );
 
+CREATE TABLE IF NOT EXISTS albumes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER REFERENCES usuarios (id) ON DELETE CASCADE,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    color_cubierta TEXT DEFAULT 'negro',
+    filas INTEGER NOT NULL DEFAULT 3,
+    columnas INTEGER NOT NULL DEFAULT 4,
+    creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS album_cartas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id INTEGER NOT NULL,
+    pagina INTEGER NOT NULL DEFAULT 1 CHECK (pagina >= 1),
+    posicion INTEGER NOT NULL DEFAULT 0 CHECK (posicion >= 0),
+    carta_id TEXT NOT NULL,
+    imagen_personalizada TEXT,
+    acabado_foil INTEGER NOT NULL DEFAULT 0,
+    cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+    agregado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (album_id) REFERENCES albumes (id) ON DELETE CASCADE,
+    FOREIGN KEY (carta_id) REFERENCES cartas (id),
+    UNIQUE (album_id, pagina, posicion)
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     clave TEXT PRIMARY KEY,
     valor TEXT
@@ -173,6 +199,34 @@ def asegurar_esquema_usuarios(conn):
         col_mc = [f[1] for f in conn.execute("PRAGMA table_info(mazo_cartas)").fetchall()]
         if "imagen_personalizada" not in col_mc:
             conn.execute("ALTER TABLE mazo_cartas ADD COLUMN imagen_personalizada TEXT")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS albumes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER REFERENCES usuarios (id) ON DELETE CASCADE,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            color_cubierta TEXT DEFAULT 'negro',
+            filas INTEGER NOT NULL DEFAULT 3,
+            columnas INTEGER NOT NULL DEFAULT 4,
+            creado_en TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS album_cartas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            album_id INTEGER NOT NULL,
+            pagina INTEGER NOT NULL DEFAULT 1 CHECK (pagina >= 1),
+            posicion INTEGER NOT NULL DEFAULT 0 CHECK (posicion >= 0),
+            carta_id TEXT NOT NULL,
+            imagen_personalizada TEXT,
+            acabado_foil INTEGER NOT NULL DEFAULT 0,
+            cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+            agregado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (album_id) REFERENCES albumes (id) ON DELETE CASCADE,
+            FOREIGN KEY (carta_id) REFERENCES cartas (id),
+            UNIQUE (album_id, pagina, posicion)
+        )
+    """)
     conn.commit()
 
 
@@ -235,6 +289,8 @@ def _exportar_snapshot_dict():
         usuarios = [dict(r) for r in conn.execute("SELECT * FROM usuarios ORDER BY id").fetchall()]
         mazos = [dict(r) for r in conn.execute("SELECT * FROM mazos ORDER BY id").fetchall()]
         mazo_cartas = [dict(r) for r in conn.execute("SELECT * FROM mazo_cartas ORDER BY id").fetchall()]
+        albumes = [dict(r) for r in conn.execute("SELECT * FROM albumes ORDER BY id").fetchall()] if tabla_existe(conn, "albumes") else []
+        album_cartas = [dict(r) for r in conn.execute("SELECT * FROM album_cartas ORDER BY id").fetchall()] if tabla_existe(conn, "album_cartas") else []
         meta = {
             r["clave"]: r["valor"]
             for r in conn.execute("SELECT clave, valor FROM meta").fetchall()
@@ -244,6 +300,8 @@ def _exportar_snapshot_dict():
         "usuarios": usuarios,
         "mazos": mazos,
         "mazo_cartas": mazo_cartas,
+        "albumes": albumes,
+        "album_cartas": album_cartas,
         "meta": meta,
     }
 
@@ -395,6 +453,48 @@ def restaurar_estado_persistente():
                     mc.get("carta_id"),
                     int(mc.get("cantidad") or 1),
                     mc.get("imagen_personalizada"),
+                ),
+            )
+        for alb in datos.get("albumes") or []:
+            uid = alb.get("usuario_id")
+            if uid and not conn.execute("SELECT 1 FROM usuarios WHERE id = ?", (uid,)).fetchone():
+                uid = None
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO albumes (id, usuario_id, nombre, descripcion, color_cubierta, filas, columnas, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    alb.get("id"),
+                    uid,
+                    alb.get("nombre") or "Álbum",
+                    alb.get("descripcion") or "",
+                    alb.get("color_cubierta") or "negro",
+                    int(alb.get("filas") or 3),
+                    int(alb.get("columnas") or 4),
+                    alb.get("creado_en"),
+                ),
+            )
+        for ac in datos.get("album_cartas") or []:
+            if not conn.execute("SELECT 1 FROM albumes WHERE id = ?", (ac.get("album_id"),)).fetchone():
+                continue
+            if not conn.execute("SELECT 1 FROM cartas WHERE id = ?", (ac.get("carta_id"),)).fetchone():
+                continue
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO album_cartas (id, album_id, pagina, posicion, carta_id, imagen_personalizada, acabado_foil, cantidad, agregado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ac.get("id"),
+                    ac.get("album_id"),
+                    int(ac.get("pagina") or 1),
+                    int(ac.get("posicion") or 0),
+                    ac.get("carta_id"),
+                    ac.get("imagen_personalizada"),
+                    int(ac.get("acabado_foil") or 0),
+                    int(ac.get("cantidad") or 1),
+                    ac.get("agregado_en"),
                 ),
             )
         conn.commit()
@@ -867,3 +967,255 @@ def resumen_portada_moxfield(limite_spoilers=8):
         "spoilers": spoilers,
         "staples": staples,
     }
+
+
+# ---------- Álbumes Físicos (Estilo Ultimate Guard QuadRow / 9-Pocket / 4-Pocket) ----------
+
+def crear_album(nombre, descripcion="", color_cubierta="negro", filas=3, columnas=4, usuario_id=None):
+    filas = max(2, min(4, int(filas or 3)))
+    columnas = max(2, min(4, int(columnas or 4)))
+    with conexion() as conn:
+        if usuario_id and not conn.execute("SELECT 1 FROM usuarios WHERE id = ?", (usuario_id,)).fetchone():
+            usuario_id = None
+        cur = conn.execute(
+            """
+            INSERT INTO albumes (usuario_id, nombre, descripcion, color_cubierta, filas, columnas)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (usuario_id, nombre.strip(), (descripcion or "").strip(), color_cubierta or "negro", filas, columnas),
+        )
+        conn.commit()
+        aid = cur.lastrowid
+    guardar_estado_persistente()
+    return aid
+
+
+def listar_albumes(usuario_id=None):
+    """
+    Lista los álbumes junto con el número total de cartas guardadas, páginas
+    ocupadas y hasta 4 imágenes en miniatura para la portada del álbum.
+    """
+    with conexion() as conn:
+        if usuario_id is not None:
+            filas = conn.execute(
+                """
+                SELECT a.*,
+                       COUNT(ac.id) AS total_bolsillos,
+                       COALESCE(SUM(ac.cantidad), 0) AS total_cartas,
+                       COALESCE(MAX(ac.pagina), 1) AS total_paginas,
+                       u.nombre AS autor_nombre
+                FROM albumes a
+                LEFT JOIN album_cartas ac ON ac.album_id = a.id
+                LEFT JOIN usuarios u ON u.id = a.usuario_id
+                WHERE a.usuario_id = ? OR a.usuario_id IS NULL
+                GROUP BY a.id
+                ORDER BY a.creado_en DESC, a.id DESC
+                """,
+                (usuario_id,),
+            ).fetchall()
+        else:
+            filas = conn.execute(
+                """
+                SELECT a.*,
+                       COUNT(ac.id) AS total_bolsillos,
+                       COALESCE(SUM(ac.cantidad), 0) AS total_cartas,
+                       COALESCE(MAX(ac.pagina), 1) AS total_paginas,
+                       u.nombre AS autor_nombre
+                FROM albumes a
+                LEFT JOIN album_cartas ac ON ac.album_id = a.id
+                LEFT JOIN usuarios u ON u.id = a.usuario_id
+                GROUP BY a.id
+                ORDER BY a.creado_en DESC, a.id DESC
+                """
+            ).fetchall()
+
+        resultado = []
+        for f in filas:
+            d = dict(f)
+            previews = conn.execute(
+                """
+                SELECT COALESCE(ac.imagen_personalizada, c.imagen_url) AS imagen_url, c.nombre
+                FROM album_cartas ac
+                JOIN cartas c ON c.id = ac.carta_id
+                WHERE ac.album_id = ?
+                ORDER BY ac.pagina ASC, ac.posicion ASC
+                LIMIT 4
+                """,
+                (d["id"],),
+            ).fetchall()
+            d["previews"] = [dict(p) for p in previews]
+            resultado.append(d)
+    return resultado
+
+
+def obtener_album_simple(album_id):
+    with conexion() as conn:
+        return conn.execute("SELECT * FROM albumes WHERE id = ?", (album_id,)).fetchone()
+
+
+def obtener_album_pagina(album_id, pagina=1):
+    """
+    Devuelve (album, diccionario_bolsillos, total_paginas, total_cartas)
+    donde `diccionario_bolsillos` mapea `posicion` (0 .. filas*columnas - 1) -> datos de la carta.
+    """
+    pagina = max(1, int(pagina or 1))
+    with conexion() as conn:
+        album = conn.execute("SELECT * FROM albumes WHERE id = ?", (album_id,)).fetchone()
+        if not album:
+            return None, {}, 1, 0
+
+        stats = conn.execute(
+            "SELECT COALESCE(MAX(pagina), 1) AS max_pag, COALESCE(SUM(cantidad), 0) AS tot FROM album_cartas WHERE album_id = ?",
+            (album_id,),
+        ).fetchone()
+        total_paginas = max(1, int(stats["max_pag"] or 1), pagina)
+        total_cartas = int(stats["tot"] or 0)
+
+        filas_pag = conn.execute(
+            """
+            SELECT ac.id AS slot_id, ac.pagina, ac.posicion, ac.carta_id,
+                   ac.imagen_personalizada, ac.acabado_foil, ac.cantidad,
+                   c.nombre, c.coste_mana, c.tipo, c.rareza, c.set_code, c.set_nombre,
+                   COALESCE(ac.imagen_personalizada, c.imagen_url) AS imagen_url
+            FROM album_cartas ac
+            JOIN cartas c ON c.id = ac.carta_id
+            WHERE ac.album_id = ? AND ac.pagina = ?
+            ORDER BY ac.posicion ASC
+            """,
+            (album_id, pagina),
+        ).fetchall()
+
+        bolsillos = {int(r["posicion"]): dict(r) for r in filas_pag}
+    return dict(album), bolsillos, total_paginas, total_cartas
+
+
+def colocar_carta_en_album(album_id, carta_id, pagina=None, posicion=None, imagen_url=None, acabado_foil=0):
+    """
+    Coloca una carta en un bolsillo específico `(pagina, posicion)` del álbum.
+    Si no se indica `posicion`, busca automáticamente el primer bolsillo libre
+    empezando en la página indicada (o página 1).
+    Devuelve (pagina_asignada, posicion_asignada, total_cartas_album).
+    """
+    with conexion() as conn:
+        album = conn.execute("SELECT * FROM albumes WHERE id = ?", (album_id,)).fetchone()
+        if not album:
+            return 1, 0, 0
+        capacidad_hoja = int(album["filas"] or 3) * int(album["columnas"] or 4)
+        pag_destino = max(1, int(pagina or 1))
+
+        if posicion is not None and 0 <= int(posicion) < capacidad_hoja:
+            pos_destino = int(posicion)
+        else:
+            # Buscar el primer bolsillo vacío desde `pag_destino`
+            while True:
+                ocupados = {
+                    int(r[0])
+                    for r in conn.execute(
+                        "SELECT posicion FROM album_cartas WHERE album_id = ? AND pagina = ?",
+                        (album_id, pag_destino),
+                    ).fetchall()
+                }
+                libres = [i for i in range(capacidad_hoja) if i not in ocupados]
+                if libres:
+                    pos_destino = libres[0]
+                    break
+                pag_destino += 1
+
+        conn.execute(
+            """
+            INSERT INTO album_cartas (album_id, pagina, posicion, carta_id, imagen_personalizada, acabado_foil, cantidad)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(album_id, pagina, posicion) DO UPDATE SET
+                carta_id = excluded.carta_id,
+                imagen_personalizada = COALESCE(excluded.imagen_personalizada, album_cartas.imagen_personalizada),
+                acabado_foil = excluded.acabado_foil
+            """,
+            (album_id, pag_destino, pos_destino, carta_id, imagen_url, int(bool(acabado_foil))),
+        )
+        conn.commit()
+        tot = conn.execute(
+            "SELECT COALESCE(SUM(cantidad), 0) FROM album_cartas WHERE album_id = ?", (album_id,)
+        ).fetchone()[0]
+    guardar_estado_persistente()
+    return pag_destino, pos_destino, int(tot or 0)
+
+
+def mover_carta_en_album(album_id, pagina_origen, pos_origen, pagina_destino, pos_destino):
+    """Intercambia o mueve una carta de un bolsillo a otro dentro del álbum físico."""
+    with conexion() as conn:
+        orig = conn.execute(
+            "SELECT * FROM album_cartas WHERE album_id = ? AND pagina = ? AND posicion = ?",
+            (album_id, pagina_origen, pos_origen),
+        ).fetchone()
+        if not orig:
+            return False
+        dest = conn.execute(
+            "SELECT * FROM album_cartas WHERE album_id = ? AND pagina = ? AND posicion = ?",
+            (album_id, pagina_destino, pos_destino),
+        ).fetchone()
+
+        if dest:
+            # Intercambiar ambos bolsillos usando una posición temporal (-1)
+            conn.execute("DELETE FROM album_cartas WHERE id IN (?, ?)", (orig["id"], dest["id"]))
+            conn.execute(
+                """
+                INSERT INTO album_cartas (album_id, pagina, posicion, carta_id, imagen_personalizada, acabado_foil, cantidad)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (album_id, pagina_destino, pos_destino, orig["carta_id"], orig["imagen_personalizada"], orig["acabado_foil"], orig["cantidad"]),
+            )
+            conn.execute(
+                """
+                INSERT INTO album_cartas (album_id, pagina, posicion, carta_id, imagen_personalizada, acabado_foil, cantidad)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (album_id, pagina_origen, pos_origen, dest["carta_id"], dest["imagen_personalizada"], dest["acabado_foil"], dest["cantidad"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE album_cartas SET pagina = ?, posicion = ? WHERE id = ?",
+                (pagina_destino, pos_destino, orig["id"]),
+            )
+        conn.commit()
+    guardar_estado_persistente()
+    return True
+
+
+def actualizar_bolsillo_album(album_id, pagina, posicion, imagen_url=None, acabado_foil=None):
+    with conexion() as conn:
+        actual = conn.execute(
+            "SELECT * FROM album_cartas WHERE album_id = ? AND pagina = ? AND posicion = ?",
+            (album_id, pagina, posicion),
+        ).fetchone()
+        if not actual:
+            return False
+        nueva_img = imagen_url if imagen_url is not None else actual["imagen_personalizada"]
+        nuevo_foil = int(bool(acabado_foil)) if acabado_foil is not None else actual["acabado_foil"]
+        conn.execute(
+            "UPDATE album_cartas SET imagen_personalizada = ?, acabado_foil = ? WHERE id = ?",
+            (nueva_img, nuevo_foil, actual["id"]),
+        )
+        conn.commit()
+    guardar_estado_persistente()
+    return True
+
+
+def quitar_carta_de_album(album_id, pagina, posicion):
+    with conexion() as conn:
+        conn.execute(
+            "DELETE FROM album_cartas WHERE album_id = ? AND pagina = ? AND posicion = ?",
+            (album_id, int(pagina), int(posicion)),
+        )
+        conn.commit()
+        tot = conn.execute(
+            "SELECT COALESCE(SUM(cantidad), 0) FROM album_cartas WHERE album_id = ?", (album_id,)
+        ).fetchone()[0]
+    guardar_estado_persistente()
+    return int(tot or 0)
+
+
+def eliminar_album(album_id):
+    with conexion() as conn:
+        conn.execute("DELETE FROM albumes WHERE id = ?", (album_id,))
+        conn.commit()
+    guardar_estado_persistente()

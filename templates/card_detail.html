@@ -68,6 +68,26 @@
             {% endif %}
         </div>
 
+        <div class="panel-seccion panel-anadir">
+            <h3>📖 Guardar en un Álbum físico (con el arte o alter seleccionado)</h3>
+            {% if albumes_globales %}
+            <form class="form-anadir-mazo" id="form-anadir-album">
+                <select id="select-album-ficha" aria-label="Álbum">
+                    {% for a in albumes_globales %}
+                        <option value="{{ a['id'] }}">{{ a['nombre'] }} ({{ a['total_cartas'] }} cartas)</option>
+                    {% endfor %}
+                </select>
+                <label style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.84rem; color:var(--parchment); cursor:pointer;">
+                    <input type="checkbox" id="check-foil-ficha"> ✨ Acabado Foil
+                </label>
+                <button type="submit">+ Meter en bolsillo libre</button>
+            </form>
+            <p id="mensaje-anadir-album" role="status"></p>
+            {% else %}
+                <p class="texto-suave">Todavía no tienes álbumes físicos creados. <a href="{{ url_for('listar_albumes_vista') }}">Crear mi primer álbum Ultimate Guard &rarr;</a></p>
+            {% endif %}
+        </div>
+
         <!-- Galería interactiva de Alters Oficiales HD (Secret Lair, Borderless, Showcase, Extended Art, Promos) -->
         <div class="panel-seccion">
             <div class="alters-seccion-header">
@@ -218,6 +238,31 @@
             } catch (error) {
                 mensaje.className = 'mensaje-error';
                 mensaje.textContent = `Error al asignar comandante: ${error.message}`;
+            }
+        });
+    }
+
+    const formAlbum = document.getElementById('form-anadir-album');
+    if (formAlbum) {
+        formAlbum.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const selectAlb = document.getElementById('select-album-ficha');
+            const albumId = selectAlb.value;
+            const esFoil = document.getElementById('check-foil-ficha')?.checked || false;
+            const imagenUrl = inputImgElegida ? inputImgElegida.value : '';
+            const msgAlb = document.getElementById('mensaje-anadir-album');
+
+            try {
+                const res = await enviarJSON(`/api/albumes/${albumId}/colocar`, {
+                    carta_id: CARTA_ID,
+                    imagen_custom: imagenUrl,
+                    es_foil: esFoil,
+                });
+                msgAlb.className = 'mensaje-ok';
+                msgAlb.innerHTML = `📖 Guardada en la <strong>Página ${res.pagina} · Bolsillo #${res.posicion + 1}</strong> ✔ — <a href="/albumes/${albumId}?pagina=${res.pagina}" style="text-decoration:underline;">Abrir hoja del álbum &rarr;</a>`;
+            } catch (error) {
+                msgAlb.className = 'mensaje-error';
+                msgAlb.textContent = `Error al guardar en álbum: ${error.message}`;
             }
         });
     }

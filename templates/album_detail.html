@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+{% block title %}{{ album['nombre'] }} · Álbum Físico · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="barra-superior-detalle">
+    <a href="{{ url_for('listar_albumes') }}">&larr; Volver a Mis Álbumes</a>
+    <a href="{{ url_for('index') }}" class="btn btn-secundario btn-sm">🃏 Explorar Catálogo Completo</a>
+</div>
+
+<!-- CABECERA DEL ÁLBUM FÍSICO -->
+<div class="cabecera-mazo binder-header-box binder-color-{{ album['color_cubierta'] or 'negro' }}">
+    <div>
+        <div class="mazo-badges">
+            <span class="badge-formato">ULTIMATE GUARD® · {{ album['columnas'] }}×{{ album['filas'] }} ({{ capacidad_hoja }} BOLSILLOS)</span>
+            <span class="mazo-fecha">Hoja negra texturizada de carga lateral</span>
+        </div>
+        <h1>📖 {{ album['nombre'] }}</h1>
+        {% if album['descripcion'] %}
+            <p class="subtitulo-cmd-header">{{ album['descripcion'] }}</p>
+        {% endif %}
+    </div>
+
+    <div class="estadisticas-mazo">
+        <div class="stat-box">
+            <span class="stat-valor" id="stat-total-album">{{ total_cartas }}</span>
+            <span class="stat-label">Cartas guardadas</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-valor">Hoja {{ pagina }} / {{ total_paginas }}</span>
+            <span class="stat-label">{{ bolsillos|length }} / {{ capacidad_hoja }} ocupados</span>
+        </div>
+    </div>
+</div>
+
+<!-- BARRA PARA COLOCAR CARTAS EN LOS BOLSILLOS DE ESTA HOJA -->
+<div class="moxfield-quickbar binder-placer-bar">
+    <div class="binder-placer-row">
+        <div class="campo-filtro campo-principal buscador-cmd-wrap">
+            <label for="input-buscar-album">
+                ➕ Buscar carta para meter en el bolsillo (escribe el nombre o toca un bolsillo vacío abajo)
+            </label>
+            <input type="text" id="input-buscar-album"
+                   placeholder="Escribe cualquier carta o spoiler (ej. Cloud, Star Trek, Black Lotus, Sol Ring, Atraxa)..."
+                   autocomplete="off">
+            <div id="dropdown-buscar-album" class="autocompletar-dropdown hidden"></div>
+        </div>
+
+        <div class="campo-filtro binder-slot-selector">
+            <label for="select-bolsillo-destino">Bolsillo destino (Hoja {{ pagina }})</label>
+            <select id="select-bolsillo-destino">
+                <option value="">⚡ Primer bolsillo libre</option>
+                {% for idx in range(capacidad_hoja) %}
+                <option value="{{ idx }}">
+                    Bolsillo #{{ idx + 1 }} {% if idx in bolsillos %}(Ocupado: {{ bolsillos[idx]['nombre'][:18] }}){% else %}(Vacío){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="campo-filtro binder-foil-check">
+            <label for="check-foil-nuevo">Acabado en funda</label>
+            <label class="foil-toggle-pill">
+                <input type="checkbox" id="check-foil-nuevo">
+                <span>✨ Efecto Foil Holográfico</span>
+            </label>
+        </div>
+    </div>
+    <p id="mensaje-album" class="texto-suave hidden" role="status"></p>
+</div>
+
+<!-- NAVEGADOR DE HOJAS DEL ÁLBUM (PASAR PÁGINA) -->
+<div class="binder-pages-toolbar">
+    <div class="binder-pages-left">
+        {% if pagina > 1 %}
+            <a href="{{ url_for('ver_album', album_id=album['id'], pagina=pagina - 1) }}" class="btn btn-secundario btn-sm">
+                ◀ Hoja Anterior
+            </a>
+        {% else %}
+            <button type="button" class="btn btn-secundario btn-sm" disabled>◀ Hoja Anterior</button>
+        {% endif %}
+
+        <div class="binder-page-pills">
+            {% for p in range(1, total_paginas + 1) %}
+                <a href="{{ url_for('ver_album', album_id=album['id'], pagina=p) }}"
+                   class="binder-page-pill {% if p == pagina %}active{% endif %}">
+                    Hoja {{ p }}
+                </a>
+            {% endfor %}
+        </div>
+
+        <a href="{{ url_for('ver_album', album_id=album['id'], pagina=pagina + 1) }}" class="btn btn-secundario btn-sm">
+            {% if pagina < total_paginas %}Hoja Siguiente ▶{% else %}+ Nueva Hoja ({{ pagina + 1 }}) ▶{% endif %}
+        </a>
+    </div>
+
+    <span class="binder-drag-hint">💡 Arrastra una carta a otro bolsillo para reorganizar tu hoja o pulsa 🎨 Alter para elegir su edición HD.</span>
+</div>
+
+<!-- =========================================================================
+     HOJA FÍSICA ULTIMATE GUARD QUADROW (LOMO CON ANILLAS + BOLSILLOS COSIDOS)
+     ========================================================================= -->
+<div class="ug-binder-wrapper">
+    <div class="ug-physical-page" id="ug-physical-page">
+        <!-- Tira lateral izquierda con las 11 perforaciones de anillas estilo Ultimate Guard -->
+        <aside class="ug-ring-strip" aria-hidden="true">
+            <div class="ug-hole ug-hole-round"></div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-strip-stamp">PVC FREE</div>
+            <div class="ug-hole ug-hole-round"></div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-hole ug-hole-round"></div>
+            <div class="ug-brand-vertical">
+                <span class="ug-brand-sub">ULTIMATE</span>
+                <span class="ug-brand-main">GUARD®</span>
+                <span class="ug-brand-model">{{ capacidad_hoja * 2 }}-Pocket QuadRow</span>
+            </div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-hole ug-hole-round"></div>
+            <div class="ug-hole ug-hole-oval"></div>
+            <div class="ug-hole ug-hole-round"></div>
+        </aside>
+
+        <!-- Cuadrícula de Bolsillos Negros Texturizados con Costuras Punteadas -->
+        <div class="ug-pockets-grid ug-cols-{{ album['columnas'] or 4 }} ug-rows-{{ album['filas'] or 3 }}" id="ug-pockets-grid">
+            {% for pos in range(capacidad_hoja) %}
+            {% set item = bolsillos.get(pos) %}
+            <div class="ug-pocket-cell {% if item %}has-card{% else %}is-empty{% endif %} {% if item and item['acabado_foil'] %}is-foil{% endif %}"
+                 data-posicion="{{ pos }}"
+                 {% if item %}
+                 data-carta-id="{{ item['carta_id'] }}"
+                 data-carta-nombre="{{ item['nombre'] }}"
+                 data-imagen-url="{{ item['imagen_url'] }}"
+                 data-foil="{{ item['acabado_foil'] }}"
+                 draggable="true"
+                 {% endif %}>
+
+                <!-- Costura superior punteada del bolsillo y abertura lateral -->
+                <div class="ug-pocket-seam-top"></div>
+                <div class="ug-pocket-side-lip"></div>
+
+                {% if item %}
+                    <div class="ug-card-in-sleeve">
+                        <img src="{{ item['imagen_url'] }}" alt="{{ item['nombre'] }}" class="ug-card-img" loading="lazy">
+                        <!-- Reflejo plástico realista de la funda transparente + brillo Foil opcional -->
+                        <div class="ug-sleeve-glare"></div>
+                        {% if item['acabado_foil'] %}
+                            <div class="ug-foil-shimmer"></div>
+                            <span class="ug-foil-badge">✨ FOIL</span>
+                        {% endif %}
+                        <span class="ug-pocket-num-badge">#{{ pos + 1 }}</span>
+
+                        <!-- Controles flotantes al pasar el ratón o tocar el bolsillo -->
+                        <div class="ug-pocket-overlay-actions">
+                            <div class="ug-pocket-card-title">{{ item['nombre'] }}</div>
+                            <div class="ug-pocket-btns">
+                                <button type="button" class="btn-xs ug-btn-zoom" title="Inspeccionar carta en grande">🔍 Ver</button>
+                                <button type="button" class="btn-xs ug-btn-alter" title="Cambiar por otro Alter Oficial HD">🎨 Alter</button>
+                                <button type="button" class="btn-xs ug-btn-foil {% if item['acabado_foil'] %}active{% endif %}" title="Activar/Desactivar brillo Foil">✨ Foil</button>
+                                <button type="button" class="btn-xs btn-eliminar ug-btn-quitar" title="Sacar del bolsillo">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <button type="button" class="ug-empty-pocket-btn" data-posicion="{{ pos }}" title="Pulsa para colocar una carta en el Bolsillo #{{ pos + 1 }}">
+                        <span class="ug-empty-num">Bolsillo #{{ pos + 1 }}</span>
+                        <span class="ug-empty-plus">+</span>
+                        <span class="ug-empty-label">Colocar carta aquí</span>
+                    </button>
+                {% endif %}
+
+                <div class="ug-pocket-seam-bottom"></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- VISOR LIGHTBOX 3D PARA INSPECCIONAR CARTA DEL ÁLBUM EN PANTALLA COMPLETA -->
+<div id="modal-visor-album" class="modal-alters-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="ug-lightbox-box">
+        <div class="ug-lightbox-card-wrap" id="ug-lightbox-card-wrap">
+            <img id="ug-lightbox-img" src="" alt="">
+            <div id="ug-lightbox-foil" class="ug-foil-shimmer hidden"></div>
+        </div>
+        <div class="ug-lightbox-bar">
+            <strong id="ug-lightbox-nombre"></strong>
+            <div class="acciones-busqueda">
+                <a id="ug-lightbox-ficha-link" href="#" class="btn btn-secundario btn-sm">Ver ficha completa</a>
+                <button type="button" class="btn btn-sm" id="btn-cerrar-visor-album">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const ALBUM_ID = {{ album['id'] | tojson }};
+    const PAGINA_ACTUAL = {{ pagina | tojson }};
+    const inputBuscar = document.getElementById('input-buscar-album');
+    const dropdown = document.getElementById('dropdown-buscar-album');
+    const selectBolsillo = document.getElementById('select-bolsillo-destino');
+    const checkFoil = document.getElementById('check-foil-nuevo');
+    const msgEl = document.getElementById('mensaje-album');
+    const grid = document.getElementById('ug-pockets-grid');
+    let timer = null;
+
+    function mostrarMensaje(texto, esError = false) {
+        if (!msgEl) return;
+        msgEl.textContent = texto;
+        msgEl.className = esError ? 'mensaje-error' : 'mensaje-ok';
+    }
+
+    // 1. Tocar un bolsillo vacío selecciona ese bolsillo y enfoca el buscador
+    grid.addEventListener('click', (e) => {
+        const emptyBtn = e.target.closest('.ug-empty-pocket-btn');
+        if (emptyBtn) {
+            const pos = emptyBtn.dataset.posicion;
+            selectBolsillo.value = pos;
+            inputBuscar.focus();
+            inputBuscar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            mostrarMensaje(`Bolsillo #${parseInt(pos, 10) + 1} seleccionado. Escribe el nombre de la carta arriba para colocarla aquí.`);
+            return;
+        }
+
+        const cell = e.target.closest('.ug-pocket-cell.has-card');
+        if (!cell) return;
+        const pos = parseInt(cell.dataset.posicion, 10);
+        const cartaId = cell.dataset.cartaId;
+        const nombreCarta = cell.dataset.cartaNombre;
+        const imgUrl = cell.dataset.imagenUrl;
+        const esFoil = cell.dataset.foil === '1';
+
+        // Zoom Lightbox
+        if (e.target.closest('.ug-btn-zoom') || e.target.classList.contains('ug-card-img')) {
+            const modalVisor = document.getElementById('modal-visor-album');
+            const imgVisor = document.getElementById('ug-lightbox-img');
+            const foilVisor = document.getElementById('ug-lightbox-foil');
+            const nomVisor = document.getElementById('ug-lightbox-nombre');
+            const linkFicha = document.getElementById('ug-lightbox-ficha-link');
+            imgVisor.src = imgUrl;
+            imgVisor.alt = nombreCarta;
+            nomVisor.textContent = `Bolsillo #${pos + 1} · ${nombreCarta}`;
+            linkFicha.href = `/carta/${encodeURIComponent(cartaId)}`;
+            foilVisor.classList.toggle('hidden', !esFoil);
+            modalVisor.classList.remove('hidden');
+            return;
+        }
+
+        // Cambiar Alter HD del bolsillo
+        if (e.target.closest('.ug-btn-alter')) {
+            abrirSelectorAlters({
+                cartaId: cartaId,
+                nombreCarta: nombreCarta,
+                albumId: ALBUM_ID,
+                pagina: PAGINA_ACTUAL,
+                posicion: pos,
+                modo: 'album_cambiar',
+                onImagenCambiada: (nuevaUrl) => {
+                    cell.dataset.imagenUrl = nuevaUrl;
+                    const imgEl = cell.querySelector('.ug-card-img');
+                    if (imgEl) imgEl.src = nuevaUrl;
+                },
+            });
+            return;
+        }
+
+        // Activar / Desactivar efecto Foil
+        if (e.target.closest('.ug-btn-foil')) {
+            const nuevoEstado = !esFoil;
+            enviarJSON(`/api/albumes/${ALBUM_ID}/actualizar_bolsillo`, {
+                pagina: PAGINA_ACTUAL,
+                posicion: pos,
+                acabado_foil: nuevoEstado,
+            }).then(() => window.location.reload())
+              .catch((err) => mostrarMensaje(err.message, true));
+            return;
+        }
+
+        // Sacar carta del bolsillo
+        if (e.target.closest('.ug-btn-quitar')) {
+            enviarJSON(`/api/albumes/${ALBUM_ID}/quitar`, {
+                pagina: PAGINA_ACTUAL,
+                posicion: pos,
+            }).then(() => window.location.reload())
+              .catch((err) => mostrarMensaje(err.message, true));
+        }
+    });
+
+    // Cerrar visor Lightbox
+    const modalVisor = document.getElementById('modal-visor-album');
+    const btnCerrarVisor = document.getElementById('btn-cerrar-visor-album');
+    if (btnCerrarVisor && modalVisor) {
+        btnCerrarVisor.onclick = () => modalVisor.classList.add('hidden');
+        modalVisor.onclick = (e) => {
+            if (e.target === modalVisor) modalVisor.classList.add('hidden');
+        };
+    }
+
+    // 2. Buscador con autocompletado para colocar cartas en el bolsillo
+    inputBuscar.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = inputBuscar.value.trim();
+        if (q.length < 2) {
+            dropdown.classList.add('hidden');
+            return;
+        }
+        timer = setTimeout(async () => {
+            const resp = await fetch(`/api/cartas/autocompletar?q=${encodeURIComponent(q)}`);
+            const data = await resp.json();
+            dropdown.replaceChildren();
+            if (!data.cartas || data.cartas.length === 0) {
+                dropdown.classList.add('hidden');
+                return;
+            }
+            data.cartas.forEach((c) => {
+                const row = document.createElement('div');
+                row.className = 'autocompletar-item';
+
+                const infoBtn = document.createElement('button');
+                infoBtn.type = 'button';
+                infoBtn.style.cssText = 'background:transparent;border:none;color:inherit;text-align:left;flex:1;padding:0;justify-content:flex-start;';
+                const st = document.createElement('strong');
+                st.textContent = c.nombre;
+                const sp = document.createElement('span');
+                sp.textContent = ` · ${c.tipo || ''}`;
+                infoBtn.appendChild(st);
+                infoBtn.appendChild(sp);
+
+                const acciones = document.createElement('div');
+                acciones.style.cssText = 'display:inline-flex;gap:0.35rem;';
+
+                const btnColocar = document.createElement('button');
+                btnColocar.type = 'button';
+                btnColocar.className = 'btn btn-xs';
+                btnColocar.textContent = '📖 Meter en bolsillo';
+
+                const btnElegirAlter = document.createElement('button');
+                btnElegirAlter.type = 'button';
+                btnElegirAlter.className = 'btn-secundario btn-xs';
+                btnElegirAlter.textContent = '🎨 Elegir Alter HD';
+
+                const colocarDirecto = async () => {
+                    dropdown.classList.add('hidden');
+                    inputBuscar.value = '';
+                    const posVal = selectBolsillo.value !== '' ? parseInt(selectBolsillo.value, 10) : null;
+                    try {
+                        const res = await enviarJSON(`/api/albumes/${ALBUM_ID}/colocar`, {
+                            carta_id: c.id,
+                            pagina: PAGINA_ACTUAL,
+                            posicion: posVal,
+                            acabado_foil: checkFoil.checked,
+                        });
+                        window.location.href = `/albumes/${ALBUM_ID}?pagina=${res.pagina}`;
+                    } catch (err) {
+                        mostrarMensaje(err.message, true);
+                    }
+                };
+
+                infoBtn.addEventListener('click', colocarDirecto);
+                btnColocar.addEventListener('click', colocarDirecto);
+
+                btnElegirAlter.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    dropdown.classList.add('hidden');
+                    const posVal = selectBolsillo.value !== '' ? parseInt(selectBolsillo.value, 10) : null;
+                    abrirSelectorAlters({
+                        cartaId: c.id,
+                        nombreCarta: c.nombre,
+                        albumId: ALBUM_ID,
+                        pagina: PAGINA_ACTUAL,
+                        posicion: posVal,
+                        modo: 'album_colocar',
+                    });
+                });
+
+                acciones.appendChild(btnColocar);
+                acciones.appendChild(btnElegirAlter);
+                row.appendChild(infoBtn);
+                row.appendChild(acciones);
+                dropdown.appendChild(row);
+            });
+            dropdown.classList.remove('hidden');
+        }, 180);
+    });
+
+    // 3. Arrastrar y soltar (Drag & Drop) entre bolsillos de la hoja física
+    let posArrastrada = null;
+    grid.addEventListener('dragstart', (e) => {
+        const cell = e.target.closest('.ug-pocket-cell.has-card');
+        if (!cell) return;
+        posArrastrada = parseInt(cell.dataset.posicion, 10);
+        cell.classList.add('is-dragging');
+    });
+
+    grid.addEventListener('dragend', (e) => {
+        const cell = e.target.closest('.ug-pocket-cell');
+        if (cell) cell.classList.remove('is-dragging');
+        document.querySelectorAll('.ug-pocket-cell.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    });
+
+    grid.addEventListener('dragover', (e) => {
+        const cell = e.target.closest('.ug-pocket-cell');
+        if (!cell || posArrastrada === null) return;
+        e.preventDefault();
+        cell.classList.add('drag-over');
+    });
+
+    grid.addEventListener('dragleave', (e) => {
+        const cell = e.target.closest('.ug-pocket-cell');
+        if (cell) cell.classList.remove('drag-over');
+    });
+
+    grid.addEventListener('drop', async (e) => {
+        const cell = e.target.closest('.ug-pocket-cell');
+        if (!cell || posArrastrada === null) return;
+        e.preventDefault();
+        cell.classList.remove('drag-over');
+        const posDestino = parseInt(cell.dataset.posicion, 10);
+        if (posDestino === posArrastrada) return;
+        try {
+            await enviarJSON(`/api/albumes/${ALBUM_ID}/mover`, {
+                pagina_origen: PAGINA_ACTUAL,
+                pos_origen: posArrastrada,
+                pagina_destino: PAGINA_ACTUAL,
+                pos_destino: posDestino,
+            });
+            window.location.reload();
+        } catch (err) {
+            mostrarMensaje(err.message, true);
+        }
+    });
+})();
+</script>
+{% endblock %}

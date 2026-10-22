@@ -43,6 +43,8 @@ async function enviarJSON(url, cuerpo) {
     return data;
 }
 
+const peticionJSON = enviarJSON;
+
 /**
  * Abre el modal global de Alters Oficiales y Ediciones en Alta Calidad (HD).
  *
@@ -81,9 +83,12 @@ async function abrirSelectorAlters(opciones) {
     modal.classList.remove('hidden');
 
     let selectMazoModal = null;
+    let selectAlbumModal = null;
+    const albumesDisp = opciones.albumesLista || window.ALBUMES_GLOBALES || [];
+
     if (opciones.mazosLista && opciones.mazosLista.length > 0 && !opciones.mazoId) {
         const lbl = document.createElement('span');
-        lbl.textContent = 'Mazo destino para añadir: ';
+        lbl.textContent = 'Mazo: ';
         selectMazoModal = document.createElement('select');
         selectMazoModal.className = 'select-formato-header';
         opciones.mazosLista.forEach(m => {
@@ -94,7 +99,24 @@ async function abrirSelectorAlters(opciones) {
         });
         subbarra.appendChild(lbl);
         subbarra.appendChild(selectMazoModal);
-    } else {
+    }
+
+    if (albumesDisp.length > 0 && !opciones.albumId) {
+        const lblAlb = document.createElement('span');
+        lblAlb.textContent = '📖 Álbum: ';
+        selectAlbumModal = document.createElement('select');
+        selectAlbumModal.className = 'select-formato-header';
+        albumesDisp.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.textContent = a.nombre;
+            selectAlbumModal.appendChild(opt);
+        });
+        subbarra.appendChild(lblAlb);
+        subbarra.appendChild(selectAlbumModal);
+    }
+
+    if (!selectMazoModal && !selectAlbumModal) {
         const info = document.createElement('span');
         info.className = 'texto-suave';
         info.textContent = 'Todas las imágenes se muestran en calidad HD (672×936 / PNG 745×1040). Elige el alter oficial que prefieras:';
@@ -145,8 +167,43 @@ async function abrirSelectorAlters(opciones) {
             acciones.className = 'alter-acciones';
 
             const mazoDestinoId = () => opciones.mazoId || (selectMazoModal ? selectMazoModal.value : null);
+            const albumDestinoId = () => opciones.albumId || (selectAlbumModal ? selectAlbumModal.value : null);
 
-            if (opciones.modo === 'cambiar_en_mazo' && opciones.mazoId) {
+            if (opciones.modo === 'album_cambiar' && opciones.albumId) {
+                const btnUsarAlb = document.createElement('button');
+                btnUsarAlb.type = 'button';
+                btnUsarAlb.className = 'btn btn-sm';
+                btnUsarAlb.textContent = '📖 Usar este alter en el bolsillo';
+                btnUsarAlb.addEventListener('click', async () => {
+                    btnUsarAlb.disabled = true;
+                    await enviarJSON(`/api/albumes/${opciones.albumId}/actualizar_bolsillo`, {
+                        pagina: opciones.pagina,
+                        posicion: opciones.posicion,
+                        imagen_url: alt.imagen_url,
+                    });
+                    cerrar();
+                    if (opciones.onImagenCambiada) opciones.onImagenCambiada(alt.imagen_url);
+                    else window.location.reload();
+                });
+                acciones.appendChild(btnUsarAlb);
+            } else if (opciones.modo === 'album_colocar' && opciones.albumId) {
+                const btnColocarAlb = document.createElement('button');
+                btnColocarAlb.type = 'button';
+                btnColocarAlb.className = 'btn btn-sm';
+                btnColocarAlb.textContent = '📖 Colocar en el álbum con este arte';
+                btnColocarAlb.addEventListener('click', async () => {
+                    btnColocarAlb.disabled = true;
+                    const r = await enviarJSON(`/api/albumes/${opciones.albumId}/colocar`, {
+                        carta_id: opciones.cartaId,
+                        pagina: opciones.pagina,
+                        posicion: opciones.posicion,
+                        imagen_url: alt.imagen_url,
+                    });
+                    cerrar();
+                    window.location.href = `/albumes/${opciones.albumId}?pagina=${r.pagina}`;
+                });
+                acciones.appendChild(btnColocarAlb);
+            } else if (opciones.modo === 'cambiar_en_mazo' && opciones.mazoId) {
                 const btnUsarMazo = document.createElement('button');
                 btnUsarMazo.type = 'button';
                 btnUsarMazo.className = 'btn btn-sm';
@@ -187,7 +244,7 @@ async function abrirSelectorAlters(opciones) {
                 });
                 acciones.appendChild(btnAdd);
             } else {
-                // Modo catálogo / ficha de carta: permite cambiar imagen de la carta Y/O añadir a un mazo con este arte
+                // Modo catálogo / ficha de carta
                 const btnFijar = document.createElement('button');
                 btnFijar.type = 'button';
                 btnFijar.className = 'btn btn-secundario btn-sm';
@@ -219,6 +276,24 @@ async function abrirSelectorAlters(opciones) {
                         setTimeout(cerrar, 500);
                     });
                     acciones.appendChild(btnAddConArte);
+                }
+
+                if (albumDestinoId()) {
+                    const btnAddAlb = document.createElement('button');
+                    btnAddAlb.type = 'button';
+                    btnAddAlb.className = 'btn btn-secundario btn-sm';
+                    btnAddAlb.textContent = '📖 + Guardar en Álbum';
+                    btnAddAlb.addEventListener('click', async () => {
+                        btnAddAlb.disabled = true;
+                        const idAlb = albumDestinoId();
+                        await enviarJSON(`/api/albumes/${idAlb}/colocar`, {
+                            carta_id: opciones.cartaId,
+                            imagen_url: alt.imagen_url,
+                        });
+                        btnAddAlb.textContent = '✓ Guardada en Álbum';
+                        setTimeout(cerrar, 500);
+                    });
+                    acciones.appendChild(btnAddAlb);
                 }
             }
 

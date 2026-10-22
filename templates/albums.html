@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Álbumes Físicos · SusoMTG{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Coleccionismo & Exposición · Estilo Ultimate Guard QuadRow</span>
+        <h1>📖 Mis Álbumes de Cartas</h1>
+    </div>
+</div>
+
+<!-- CREADOR DE NUEVO ÁLBUM FÍSICO -->
+<form method="post" action="{{ url_for('crear_album') }}" class="form-nuevo-mazo album-creator-box">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="campo-filtro campo-principal">
+        <label for="input-nombre-album">1. Nombre del Álbum</label>
+        <input type="text" id="input-nombre-album" name="nombre"
+               placeholder="Ej. Colección Star Trek & Final Fantasy, Secret Lair Favoritas, Trade Binder..."
+               required maxlength="100">
+    </div>
+
+    <div class="campo-filtro">
+        <label for="select-formato-hoja">2. Tipo de Hoja Física (Bolsillos)</label>
+        <select id="select-formato-hoja" name="formato_hoja">
+            <option value="4x3" selected>🖤 12 Bolsillos (4×3 · Ultimate Guard QuadRow)</option>
+            <option value="3x3">📖 9 Bolsillos (3×3 · Estándar Clásico)</option>
+            <option value="2x2">💎 4 Bolsillos (2×2 · Compacto Coleccionista)</option>
+        </select>
+    </div>
+
+    <div class="campo-filtro">
+        <label for="select-color-cubierta">3. Cubierta Xenoskin</label>
+        <select id="select-color-cubierta" name="color_cubierta">
+            <option value="negro" selected>⚫ Negro Ultimate Guard (Onyx)</option>
+            <option value="violeta">🟣 Violeta Moxfield (Amethyst)</option>
+            <option value="rojo">🔴 Rojo Carmesí (Ruby)</option>
+            <option value="azul">🔵 Azul Zafiro (Sapphire)</option>
+            <option value="verde">🟢 Verde Esmeralda (Emerald)</option>
+            <option value="dorado">🟡 Dorado Coleccionista (Gold)</option>
+        </select>
+    </div>
+
+    <div class="campo-filtro campo-principal">
+        <label for="input-desc-album">4. Descripción o temática (opcional)</label>
+        <input type="text" id="input-desc-album" name="descripcion"
+               placeholder="Ej. Mis cartas favoritas en versión Borderless, Showcase y Foil..." maxlength="180">
+    </div>
+
+    <div class="acciones-busqueda">
+        <button type="submit">+ Crear Álbum Físico</button>
+    </div>
+</form>
+
+<!-- ESTANTERÍA DE ÁLBUMES -->
+<div class="albumes-shelf-grid">
+    {% for alb in albumes %}
+    {% set bolsillos_por_hoja = (alb['filas'] or 3) * (alb['columnas'] or 4) %}
+    <article class="binder-cover-card binder-color-{{ alb['color_cubierta'] or 'negro' }}">
+        <div class="binder-spine"></div>
+        <div class="binder-cover-content">
+            <div class="binder-cover-top">
+                <span class="binder-brand-tag">ULTIMATE GUARD® · {{ alb['columnas'] }}×{{ alb['filas'] }} ({{ bolsillos_por_hoja }} POCKETS)</span>
+                <span class="binder-count-pill">{{ alb['total_cartas'] }} carta(s) · {{ alb['total_paginas'] }} hoja(s)</span>
+            </div>
+
+            <a href="{{ url_for('ver_album', album_id=alb['id']) }}" class="binder-cover-title-link">
+                <h2>{{ alb['nombre'] }}</h2>
+                {% if alb['descripcion'] %}
+                    <p>{{ alb['descripcion'] }}</p>
+                {% else %}
+                    <p>Álbum físico de exposición con hojas negras texturizadas de carga lateral.</p>
+                {% endif %}
+            </a>
+
+            <!-- Mini vista previa de los bolsillos del álbum -->
+            <a href="{{ url_for('ver_album', album_id=alb['id']) }}" class="binder-mini-pockets">
+                {% for i in range(4) %}
+                    {% if alb['previews']|length > i %}
+                        <div class="binder-mini-slot has-card">
+                            <img src="{{ alb['previews'][i]['imagen_url'] }}" alt="{{ alb['previews'][i]['nombre'] }}" loading="lazy">
+                        </div>
+                    {% else %}
+                        <div class="binder-mini-slot empty-slot">
+                            <span>#{{ i + 1 }}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </a>
+
+            <div class="binder-cover-footer">
+                <a href="{{ url_for('ver_album', album_id=alb['id']) }}" class="btn btn-sm">
+                    📖 Abrir Álbum Físico
+                </a>
+                <form method="post" action="{{ url_for('eliminar_album', album_id=alb['id']) }}"
+                      onsubmit="return confirm('¿Eliminar este álbum y vaciar sus bolsillos?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-eliminar btn-sm">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </article>
+    {% else %}
+    <div class="estado-vacio binder-empty-showcase">
+        <img src="{{ url_for('static', filename='img/ultimate_guard_page.webp') }}" alt="Hoja de álbum Ultimate Guard" class="ug-reference-thumb">
+        <div>
+            <h3>Todavía no has creado ningún álbum físico</h3>
+            <p>Crea arriba tu primer álbum estilo <strong>Ultimate Guard QuadRow (12 bolsillos por hoja)</strong> para colocar tus cartas, spoilers y Alters HD favoritos en sus fundas.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
