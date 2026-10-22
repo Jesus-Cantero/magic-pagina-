@@ -1016,7 +1016,7 @@ def resumen_portada_moxfield(limite_spoilers=8):
     }
 
 
-# ---------- Álbumes Físicos (Estilo Ultimate Guard QuadRow / 9-Pocket / 4-Pocket) ----------
+# ---------- Álbumes Físicos (Hojas de 12, 9 y 4 Bolsillos) ----------
 
 def crear_album(nombre, descripcion="", color_cubierta="negro", filas=3, columnas=4, usuario_id=None):
     filas = max(2, min(4, int(filas or 3)))

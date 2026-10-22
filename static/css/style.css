@@ -3832,82 +3832,26 @@ html, body {
 }
 
 /* =====================================================
-   ÁLBUMES FÍSICOS DE COLECCIÓN (ESTILO ULTIMATE GUARD®)
+   ÁLBUMES FÍSICOS DE COLECCIÓN (HOJAS NEGRAS DE BOLSILLOS)
    ===================================================== */
 
-.albumes-hero-showcase {
-    background: linear-gradient(135deg, #11141c 0%, #171b26 55%, #0d0f14 100%);
-    border: 1px solid var(--line-light);
-    border-radius: 16px;
-    padding: 1.5rem 1.75rem;
+.album-creator-box {
     margin-bottom: 1.75rem;
-    display: grid;
-    grid-template-columns: 1.35fr 1fr;
-    gap: 1.5rem;
-    align-items: center;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
-.albumes-hero-copy h2 {
-    margin: 0.25rem 0 0.55rem;
-    font-size: 1.45rem;
-    color: #ffffff;
-}
-
-.albumes-hero-copy p {
-    margin: 0 0 0.9rem;
-    color: var(--muted);
-    font-size: 0.92rem;
-    line-height: 1.55;
-}
-
-.albumes-hero-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-}
-
-.ug-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.28rem 0.65rem;
-    border-radius: 999px;
-    background: rgba(124, 92, 255, 0.14);
-    border: 1px solid rgba(124, 92, 255, 0.35);
-    color: var(--parchment);
-}
-
-.albumes-hero-preview-img {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-    background: #090b0f;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 0.75rem;
-}
-
-.ug-reference-photo {
-    max-height: 190px;
-    width: auto;
-    object-fit: contain;
-    border-radius: 8px;
-    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.65));
-}
-
-.ug-reference-caption {
-    font-size: 0.72rem;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-}
-
-/* Estantería de Álbumes (Tarjetas Xenoskin) */
+/* Estantería de Álbumes */
 .albumes-shelf-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
     gap: 1.25rem;
 }
+
+.binder-color-negro   { --binder-accent: #64748b; }
+.binder-color-violeta { --binder-accent: #8b5cf6; }
+.binder-color-rojo    { --binder-accent: #ef4444; }
+.binder-color-azul    { --binder-accent: #3b82f6; }
+.binder-color-verde   { --binder-accent: #10b981; }
+.binder-color-dorado  { --binder-accent: #f59e0b; }
 
 .binder-cover-card {
     position: relative;
@@ -3916,7 +3860,7 @@ html, body {
         repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 2px, transparent 2px, transparent 4px),
         #151822;
     border: 1px solid var(--line-light);
-    border-left: 6px solid var(--binder-accent, #7c5cff);
+    border-left: 7px solid var(--binder-accent, #7c5cff);
     border-radius: 14px;
     overflow: hidden;
     display: flex;
@@ -3932,7 +3876,7 @@ html, body {
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
-.binder-spine-stitch {
+.binder-spine {
     position: absolute;
     top: 8px;
     bottom: 8px;
@@ -3942,11 +3886,12 @@ html, body {
     pointer-events: none;
 }
 
-.binder-cover-body {
-    padding: 1.15rem 1.2rem 0.9rem 1.35rem;
+.binder-cover-content {
+    padding: 1.15rem 1.2rem 1rem 1.35rem;
     display: flex;
     flex-direction: column;
-    gap: 0.7rem;
+    gap: 0.75rem;
+    height: 100%;
 }
 
 .binder-cover-top {
@@ -3954,11 +3899,12 @@ html, body {
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.binder-format-pill {
+.binder-brand-tag {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.04em;
     padding: 0.2rem 0.55rem;
@@ -3968,28 +3914,31 @@ html, body {
     border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-.binder-card-counter {
+.binder-count-pill {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     color: var(--muted);
 }
 
-.binder-title-link {
+.binder-cover-title-link {
     text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.binder-title-link h3 {
+.binder-cover-title-link h2 {
     margin: 0;
     font-size: 1.22rem;
     color: #ffffff;
     transition: color 0.15s ease;
 }
 
-.binder-title-link:hover h3 {
+.binder-cover-title-link:hover h2 {
     color: var(--accent-light);
 }
 
-.binder-desc {
+.binder-cover-title-link p {
     margin: 0;
     font-size: 0.82rem;
     color: var(--muted);
@@ -3997,7 +3946,7 @@ html, body {
 }
 
 /* Mini ventana de 4 bolsillos en la portada del álbum */
-.binder-mini-window {
+.binder-mini-pockets {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.4rem;
@@ -4005,10 +3954,11 @@ html, body {
     border: 1px solid #262a36;
     border-radius: 9px;
     padding: 0.45rem;
-    margin-top: 0.2rem;
+    margin-top: auto;
+    text-decoration: none;
 }
 
-.binder-mini-pocket {
+.binder-mini-slot {
     aspect-ratio: 63 / 88;
     background: #12141a;
     border: 1px dashed rgba(255, 255, 255, 0.14);
@@ -4019,192 +3969,128 @@ html, body {
     justify-content: center;
 }
 
-.binder-mini-pocket img {
+.binder-mini-slot img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.binder-mini-empty {
+.binder-mini-slot.empty-slot span {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.18);
 }
 
-.binder-cover-actions {
-    padding: 0.8rem 1.2rem 0.95rem 1.35rem;
+.binder-cover-footer {
+    padding-top: 0.75rem;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(0, 0, 0, 0.22);
     display: flex;
+    justify-content: space-between;
     gap: 0.5rem;
     align-items: center;
 }
 
-.binder-cover-actions .btn-primario {
-    flex: 1;
-    justify-content: center;
+.binder-empty-showcase {
+    grid-column: 1 / -1;
 }
 
 /* =====================================================
-   INTERIOR DEL ÁLBUM: HOJA FÍSICA ULTIMATE GUARD
+   INTERIOR DEL ÁLBUM: CABECERA, BUSCADOR Y NAVEGACIÓN DE HOJAS
    ===================================================== */
 
-.ug-album-header {
-    background: var(--panel);
-    border: 1px solid var(--line-light);
+.binder-header-box {
     border-top: 3px solid var(--binder-accent, #7c5cff);
-    border-radius: 14px;
-    padding: 1.1rem 1.35rem;
-    margin-bottom: 1.15rem;
+}
+
+.binder-placer-bar {
+    margin-bottom: 1rem;
+}
+
+.binder-placer-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.ug-album-title-block h1 {
-    margin: 0.15rem 0 0.2rem;
-    font-size: 1.5rem;
-    color: #ffffff;
-}
-
-.ug-album-controls {
-    display: flex;
-    align-items: center;
     gap: 0.85rem;
-    flex-wrap: wrap;
+    align-items: flex-end;
 }
 
-.ug-page-turner {
-    display: flex;
+.binder-slot-selector {
+    min-width: 210px;
+}
+
+.binder-foil-check {
+    min-width: 190px;
+}
+
+.foil-toggle-pill {
+    display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.45rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 9px;
     background: var(--void);
     border: 1px solid var(--line-light);
-    border-radius: 10px;
-    padding: 0.35rem 0.5rem;
-}
-
-.ug-page-indicator {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 0.55rem;
-    line-height: 1.15;
-}
-
-.ug-page-num {
-    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
     font-size: 0.84rem;
-    font-weight: 800;
-    color: #ffffff;
+    color: var(--parchment);
 }
 
-.ug-page-sub {
-    font-size: 0.68rem;
-    color: var(--muted);
-}
-
-/* Buscador desplegable para meter cartas en bolsillos */
-.ug-add-drawer {
-    background: var(--panel);
-    border: 1px solid var(--accent);
-    border-radius: 14px;
-    padding: 1.15rem 1.3rem;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-}
-
-.ug-add-drawer-top {
+.binder-pages-toolbar {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 0.85rem;
-}
-
-.ug-add-drawer-top h3 {
-    margin: 0 0 0.2rem;
-    font-size: 1.08rem;
-    color: #ffffff;
-}
-
-.ug-drawer-search-bar {
-    display: flex;
-    gap: 0.55rem;
-    margin-bottom: 0.85rem;
-}
-
-.ug-drawer-search-bar input {
-    flex: 1;
-    background: var(--void);
-}
-
-.ug-drawer-results-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 0.7rem;
-    max-height: 360px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-}
-
-.ug-drawer-card-item {
-    background: var(--panel-2);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 0.5rem;
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+}
+
+.binder-pages-left {
     display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.ug-drawer-card-thumb {
-    aspect-ratio: 63 / 88;
-    border-radius: 6px;
-    overflow: hidden;
-    background: #090b0f;
-}
-
-.ug-drawer-card-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.ug-drawer-card-info {
+.binder-page-pills {
     display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
 }
 
-.ug-drawer-card-info strong {
-    font-size: 0.78rem;
-    color: #ffffff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.ug-drawer-card-info span {
-    font-size: 0.68rem;
+.binder-page-pill {
+    padding: 0.32rem 0.68rem;
+    border-radius: 7px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-light);
     color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.15s ease;
 }
 
-.ug-drawer-card-btns {
-    display: flex;
-    gap: 0.3rem;
+.binder-page-pill:hover {
+    border-color: var(--accent);
+    color: #ffffff;
 }
 
-.ug-drawer-card-btns .btn {
-    flex: 1;
-    padding: 0.3rem 0.4rem;
-    font-size: 0.72rem;
-    justify-content: center;
+.binder-page-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.binder-drag-hint {
+    font-size: 0.78rem;
+    color: var(--muted);
 }
 
 /* =====================================================
-   HOJA FÍSICA NEGRA TEXTURIZADA ULTIMATE GUARD (12/9/4 BOLSILLOS)
+   HOJA FÍSICA NEGRA TEXTURIZADA DE 12 / 9 / 4 BOLSILLOS
    ===================================================== */
 
 .ug-binder-wrapper {
@@ -4212,7 +4098,7 @@ html, body {
     flex-direction: column;
     align-items: center;
     gap: 0.9rem;
-    margin: 0.5rem 0 2rem;
+    margin: 0.5rem 0 2.25rem;
 }
 
 .ug-physical-page {
@@ -4220,7 +4106,7 @@ html, body {
     max-width: 1120px;
     display: grid;
     grid-template-columns: 54px 1fr;
-    /* Textura negra micro-porosa estilo tela sin tejer de Ultimate Guard */
+    /* Textura negra micro-porosa antideslizante de hoja de álbum */
     background-color: #141518;
     background-image:
         radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 0),
@@ -4238,7 +4124,7 @@ html, body {
     overflow: hidden;
 }
 
-/* Banda izquierda perforada de 11 anillas con grabado ULTIMATE GUARD® */
+/* Banda izquierda perforada de 11 anillas */
 .ug-ring-strip {
     background: linear-gradient(90deg, #1b1d22 0%, #121317 75%, #0d0e11 100%);
     border-right: 2px dashed rgba(255, 255, 255, 0.14);
@@ -4252,7 +4138,6 @@ html, body {
     box-shadow: inset -4px 0 8px rgba(0, 0, 0, 0.65);
 }
 
-/* Línea de termosellado vertical junto a los agujeros */
 .ug-ring-strip::after {
     content: "";
     position: absolute;
@@ -4280,48 +4165,52 @@ html, body {
     border-radius: 999px;
 }
 
-.ug-brand-emboss {
+.ug-strip-stamp,
+.ug-brand-vertical {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     font-family: 'Inter', sans-serif;
-    font-size: 0.56rem;
-    font-weight: 900;
-    letter-spacing: 0.22em;
+    font-size: 0.54rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
     color: rgba(255, 255, 255, 0.18);
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
-    margin: 0.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
 /* Matriz de bolsillos cosidos */
 .ug-pockets-grid {
     display: grid;
-    grid-template-columns: repeat(var(--ug-cols, 4), minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     padding: 0.85rem 1rem 0.95rem 0.85rem;
     position: relative;
 }
+
+.ug-pockets-grid.ug-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ug-pockets-grid.ug-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ug-pockets-grid.ug-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* Cada bolsillo individual de la hoja */
 .ug-pocket-cell {
     position: relative;
     aspect-ratio: 63 / 88;
     padding: 0.55rem;
-    /* Costuras termoselladas punteadas entre bolsillos estilo Ultimate Guard */
     border-right: 2px dashed rgba(255, 255, 255, 0.14);
     border-bottom: 2px dashed rgba(255, 255, 255, 0.14);
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     transition: background 0.18s ease;
-}
-
-/* Bordes exteriores de la matriz de bolsillos */
-.ug-pocket-cell:nth-child(1),
-.ug-pocket-cell:nth-child(2),
-.ug-pocket-cell:nth-child(3),
-.ug-pocket-cell:nth-child(4) {
-    border-top: 2px dashed rgba(255, 255, 255, 0.14);
+    background:
+        radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+        linear-gradient(145deg, #0d0e11 0%, #15171c 100%);
+    background-size: 5px 5px, 100% 100%;
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.88);
 }
 
 .ug-pocket-cell.drag-over {
@@ -4329,36 +4218,24 @@ html, body {
     box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-/* Fondo negro micro-texturizado del bolsillo individual */
-.ug-pocket-backing {
+.ug-pocket-side-lip {
     position: absolute;
-    inset: 6px;
-    border-radius: 6px;
-    background:
-        radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0),
-        linear-gradient(145deg, #0d0e11 0%, #15171c 100%);
-    background-size: 5px 5px, 100% 100%;
-    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.92);
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-    padding: 0.35rem 0.45rem;
+    top: 10%;
+    bottom: 10%;
+    right: 5px;
+    width: 3px;
+    z-index: 4;
+    border-left: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 2px;
     pointer-events: none;
-}
-
-.ug-pocket-slot-number {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.16);
 }
 
 /* Carta dentro del bolsillo */
 .ug-card-in-sleeve {
     position: relative;
     z-index: 2;
-    width: 94%;
-    height: 94%;
+    width: 95%;
+    height: 95%;
     border-radius: 8px;
     overflow: hidden;
     box-shadow:
@@ -4409,52 +4286,51 @@ html, body {
     100% { background-position: 0% 50%; }
 }
 
-.ug-card-badges {
+.ug-foil-badge {
     position: absolute;
     top: 6px;
     left: 6px;
-    display: flex;
-    gap: 0.25rem;
-    z-index: 4;
-    pointer-events: none;
-}
-
-.ug-foil-badge,
-.ug-alter-badge {
+    z-index: 5;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.6rem;
     font-weight: 800;
     padding: 0.12rem 0.38rem;
     border-radius: 4px;
-    backdrop-filter: blur(4px);
-}
-
-.ug-foil-badge {
     background: linear-gradient(90deg, rgba(236, 72, 153, 0.88), rgba(139, 92, 246, 0.88));
     color: #ffffff;
+    pointer-events: none;
 }
 
-.ug-alter-badge {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(167, 139, 250, 0.6);
-    color: #c4b5fd;
+.ug-pocket-num-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    background: rgba(11, 13, 18, 0.72);
+    color: rgba(255, 255, 255, 0.75);
+    pointer-events: none;
 }
 
 /* Botón vacío para meter carta en el bolsillo */
 .ug-empty-pocket-btn {
     position: relative;
     z-index: 2;
-    width: 88%;
-    height: 88%;
+    width: 90%;
+    height: 90%;
     border-radius: 7px;
-    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border: 1px dashed rgba(255, 255, 255, 0.16);
     background: rgba(255, 255, 255, 0.015);
-    color: rgba(255, 255, 255, 0.32);
+    color: rgba(255, 255, 255, 0.34);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.3rem;
+    gap: 0.25rem;
     cursor: pointer;
     transition: all 0.16s ease;
 }
@@ -4464,6 +4340,12 @@ html, body {
     border-color: var(--accent-light);
     color: #ffffff;
     transform: scale(1.02);
+}
+
+.ug-empty-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66rem;
+    opacity: 0.7;
 }
 
 .ug-empty-plus {
@@ -4477,14 +4359,13 @@ html, body {
     font-weight: 600;
 }
 
-/* Lámina transparente de polipropileno sobre la mitad inferior/completa del bolsillo (como en la foto de Ultimate Guard) */
+/* Lámina transparente de polipropileno sobre el bolsillo */
 .ug-sleeve-glare {
     position: absolute;
-    inset: 5px;
+    inset: 0;
     z-index: 3;
-    border-radius: 5px;
+    border-radius: 8px;
     pointer-events: none;
-    /* Simula el plástico transparente con abertura lateral y reflejo diagonal */
     background:
         linear-gradient(
             135deg,
@@ -4499,149 +4380,70 @@ html, body {
     box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.12);
 }
 
-/* Ranura de carga lateral (Side-Loading Slit) */
-.ug-side-loading-slit {
+/* Controles superpuestos al pasar el ratón por el bolsillo */
+.ug-pocket-overlay-actions {
     position: absolute;
-    top: 10%;
-    bottom: 10%;
-    right: 6px;
-    width: 3px;
-    z-index: 4;
-    border-left: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 2px;
-    pointer-events: none;
-}
-
-/* Barra flotante de acciones al pasar el ratón sobre un bolsillo con carta */
-.ug-pocket-hover-bar {
-    position: absolute;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%) translateY(6px);
+    inset: auto 0 0 0;
     z-index: 6;
+    background: linear-gradient(180deg, transparent 0%, rgba(8, 10, 15, 0.92) 38%, rgba(8, 10, 15, 0.98) 100%);
+    padding: 1.2rem 0.45rem 0.45rem;
     display: flex;
-    gap: 0.25rem;
-    background: rgba(11, 13, 18, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 8px;
-    padding: 0.22rem 0.3rem;
+    flex-direction: column;
+    gap: 0.3rem;
     opacity: 0;
-    pointer-events: none;
+    transform: translateY(6px);
     transition: opacity 0.16s ease, transform 0.16s ease;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.8);
 }
 
-.ug-pocket-cell:hover .ug-pocket-hover-bar {
+.ug-pocket-cell:hover .ug-pocket-overlay-actions {
     opacity: 1;
-    pointer-events: auto;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
 }
 
-.ug-pocket-action-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--parchment);
-    font-size: 0.78rem;
-    padding: 0.2rem 0.36rem;
-    border-radius: 5px;
-    cursor: pointer;
-    text-decoration: none;
-    line-height: 1;
-    transition: background 0.14s ease, border-color 0.14s ease;
-}
-
-.ug-pocket-action-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.22);
-}
-
-.ug-pocket-action-btn.active {
-    background: rgba(236, 72, 153, 0.25);
-    border-color: rgba(236, 72, 153, 0.6);
-}
-
-.ug-pocket-action-btn.danger:hover {
-    background: rgba(239, 68, 68, 0.25);
-    border-color: rgba(239, 68, 68, 0.6);
-}
-
-/* Paginación rápida inferior por puntos */
-.ug-page-dots {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.ug-page-dot {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: var(--panel);
-    border: 1px solid var(--line-light);
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
+.ug-pocket-card-title {
+    font-size: 0.72rem;
     font-weight: 700;
-    display: inline-flex;
-    align-items: center;
+    color: #ffffff;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ug-pocket-btns {
+    display: flex;
     justify-content: center;
-    text-decoration: none;
-    transition: all 0.15s ease;
+    gap: 0.25rem;
+    flex-wrap: wrap;
 }
 
-.ug-page-dot:hover {
-    border-color: var(--accent);
-    color: #ffffff;
+.ug-pocket-btns .btn-xs {
+    padding: 0.22rem 0.4rem;
+    font-size: 0.68rem;
 }
 
-.ug-page-dot.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #ffffff;
-}
-
-.ug-page-dot.ug-page-dot-add {
-    border-style: dashed;
-    color: var(--accent-light);
-}
-
-/* Modal Lightbox 3D al sacar la carta del bolsillo para verla de cerca */
+/* Modal Lightbox 4K al sacar la carta del bolsillo para verla de cerca */
 .ug-lightbox-box {
     background: var(--panel);
     border: 1px solid var(--line-light);
     border-radius: 16px;
     padding: 1.35rem;
-    max-width: 410px;
+    max-width: 460px;
     width: 92vw;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.9rem;
+    gap: 0.95rem;
     position: relative;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
-}
-
-.ug-lightbox-close {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--line-light);
-    background: var(--panel-2);
-    color: #ffffff;
-    cursor: pointer;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.88);
 }
 
 .ug-lightbox-card-wrap {
     position: relative;
     width: 100%;
-    max-width: 320px;
+    max-width: 380px;
     aspect-ratio: 63 / 88;
-    border-radius: 14px;
+    border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.85);
 }
@@ -4649,35 +4451,25 @@ html, body {
 .ug-lightbox-card-wrap img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
-.ug-lightbox-meta {
+.ug-lightbox-bar {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.6rem;
     width: 100%;
 }
 
-.ug-lightbox-meta h3 {
-    margin: 0;
+.ug-lightbox-bar strong {
     color: #ffffff;
-    font-size: 1.15rem;
-    text-align: center;
-}
-
-.ug-lightbox-btns {
-    display: flex;
-    gap: 0.5rem;
+    font-size: 1rem;
 }
 
 /* Adaptación de Álbumes y Hoja Física a Móvil y Tablet */
 @media (max-width: 900px) {
-    .albumes-hero-showcase {
-        grid-template-columns: 1fr;
-        padding: 1.15rem;
-    }
     .ug-physical-page {
         grid-template-columns: 32px 1fr;
     }
@@ -4688,45 +4480,26 @@ html, body {
     .ug-hole.ug-hole-oval {
         height: 16px;
     }
-    .ug-brand-emboss {
-        font-size: 0.45rem;
+    .ug-strip-stamp,
+    .ug-brand-vertical {
+        font-size: 0.44rem;
     }
 }
 
 @media (max-width: 680px) {
-    .ug-album-header {
-        padding: 0.95rem;
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .ug-album-controls {
-        width: 100%;
-        justify-content: space-between;
-    }
-    .ug-page-turner {
-        width: 100%;
-        justify-content: space-between;
-    }
-    /* En pantallas de móvil permitimos hacer scroll horizontal suave o ver 2 bolsillos por fila sin deformar las cartas */
-    .ug-pockets-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    .ug-pockets-grid,
+    .ug-pockets-grid.ug-cols-4,
+    .ug-pockets-grid.ug-cols-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         padding: 0.5rem;
     }
     .ug-pocket-cell {
         padding: 0.35rem;
     }
-    .ug-pocket-hover-bar {
+    .ug-pocket-overlay-actions {
         opacity: 1;
-        pointer-events: auto;
-        transform: translateX(-50%) translateY(0);
-        bottom: 6px;
-        padding: 0.15rem 0.2rem;
-    }
-    .ug-drawer-search-bar {
-        flex-direction: column;
-    }
-    .ug-drawer-results-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        transform: translateY(0);
+        padding: 0.6rem 0.3rem 0.3rem;
     }
 }
 
@@ -4739,8 +4512,7 @@ html, body {
 #img-ficha-principal,
 .ug-card-img,
 .ug-lightbox-card-wrap img,
-.ug-drawer-card-thumb img,
-.binder-mini-pocket img,
+.binder-mini-slot img,
 .alter-thumb-btn img,
 .modal-alter-card img,
 .combo-carta-item img {
@@ -4751,5 +4523,6 @@ html, body {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: high-quality;
 }
+
 
 

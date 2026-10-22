@@ -1176,7 +1176,7 @@ def eliminar_mazo(mazo_id):
     return redirect(url_for("listar_mazos"))
 
 
-# ---------- Álbumes Físicos (Estilo Ultimate Guard QuadRow 12-Pocket / 9-Pocket / 4-Pocket) ----------
+# ---------- Álbumes Físicos (Hojas de 12, 9 y 4 Bolsillos) ----------
 
 @app.route("/albumes")
 @app.route("/albunes")
@@ -1200,7 +1200,7 @@ def crear_album():
         return redirect(url_for("listar_albumes"))
 
     mapa_hoja = {
-        "4x3": (3, 4),  # 12 bolsillos QuadRow (Ultimate Guard)
+        "4x3": (3, 4),  # 12 bolsillos gran formato
         "3x3": (3, 3),  # 9 bolsillos estándar
         "2x2": (2, 2),  # 4 bolsillos compacto
     }

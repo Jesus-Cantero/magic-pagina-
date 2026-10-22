@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <span class="eyebrow">Coleccionismo & Exposición · Estilo Ultimate Guard QuadRow</span>
+        <span class="eyebrow">Coleccionismo & Exposición · Hojas Negras de Carga Lateral (4K UHD)</span>
         <h1>📖 Mis Álbumes de Cartas</h1>
     </div>
 </div>
@@ -23,28 +23,28 @@
     <div class="campo-filtro">
         <label for="select-formato-hoja">2. Tipo de Hoja Física (Bolsillos)</label>
         <select id="select-formato-hoja" name="formato_hoja">
-            <option value="4x3" selected>🖤 12 Bolsillos (4×3 · Ultimate Guard QuadRow)</option>
+            <option value="4x3" selected>🖤 12 Bolsillos (4×3 · Gran Formato)</option>
             <option value="3x3">📖 9 Bolsillos (3×3 · Estándar Clásico)</option>
             <option value="2x2">💎 4 Bolsillos (2×2 · Compacto Coleccionista)</option>
         </select>
     </div>
 
     <div class="campo-filtro">
-        <label for="select-color-cubierta">3. Cubierta Xenoskin</label>
+        <label for="select-color-cubierta">3. Color de Cubierta</label>
         <select id="select-color-cubierta" name="color_cubierta">
-            <option value="negro" selected>⚫ Negro Ultimate Guard (Onyx)</option>
-            <option value="violeta">🟣 Violeta Moxfield (Amethyst)</option>
-            <option value="rojo">🔴 Rojo Carmesí (Ruby)</option>
-            <option value="azul">🔵 Azul Zafiro (Sapphire)</option>
-            <option value="verde">🟢 Verde Esmeralda (Emerald)</option>
-            <option value="dorado">🟡 Dorado Coleccionista (Gold)</option>
+            <option value="negro" selected>⚫ Negro Ónix</option>
+            <option value="violeta">🟣 Violeta Amatista</option>
+            <option value="rojo">🔴 Rojo Carmesí</option>
+            <option value="azul">🔵 Azul Zafiro</option>
+            <option value="verde">🟢 Verde Esmeralda</option>
+            <option value="dorado">🟡 Dorado Coleccionista</option>
         </select>
     </div>
 
     <div class="campo-filtro campo-principal">
         <label for="input-desc-album">4. Descripción o temática (opcional)</label>
         <input type="text" id="input-desc-album" name="descripcion"
-               placeholder="Ej. Mis cartas favoritas en versión Borderless, Showcase y Foil..." maxlength="180">
+               placeholder="Ej. Mis cartas favoritas en versión Borderless, Showcase y Foil 4K..." maxlength="180">
     </div>
 
     <div class="acciones-busqueda">
@@ -60,7 +60,7 @@
         <div class="binder-spine"></div>
         <div class="binder-cover-content">
             <div class="binder-cover-top">
-                <span class="binder-brand-tag">ULTIMATE GUARD® · {{ alb['columnas'] }}×{{ alb['filas'] }} ({{ bolsillos_por_hoja }} POCKETS)</span>
+                <span class="binder-brand-tag">PRO-BINDER · {{ alb['columnas'] }}×{{ alb['filas'] }} ({{ bolsillos_por_hoja }} BOLSILLOS)</span>
                 <span class="binder-count-pill">{{ alb['total_cartas'] }} carta(s) · {{ alb['total_paginas'] }} hoja(s)</span>
             </div>
 
@@ -69,7 +69,7 @@
                 {% if alb['descripcion'] %}
                     <p>{{ alb['descripcion'] }}</p>
                 {% else %}
-                    <p>Álbum físico de exposición con hojas negras texturizadas de carga lateral.</p>
+                    <p>Álbum físico de exposición con hojas negras texturizadas de carga lateral en 4K.</p>
                 {% endif %}
             </a>
 
@@ -102,10 +102,9 @@
     </article>
     {% else %}
     <div class="estado-vacio binder-empty-showcase">
-        <img src="{{ url_for('static', filename='img/ultimate_guard_page.webp') }}" alt="Hoja de álbum Ultimate Guard" class="ug-reference-thumb">
         <div>
             <h3>Todavía no has creado ningún álbum físico</h3>
-            <p>Crea arriba tu primer álbum estilo <strong>Ultimate Guard QuadRow (12 bolsillos por hoja)</strong> para colocar tus cartas, spoilers y Alters HD favoritos en sus fundas.</p>
+            <p>Crea arriba tu primer álbum con <strong>hojas negras texturizadas de 12, 9 o 4 bolsillos</strong> para colocar tus cartas, spoilers y Alters 4K favoritos en sus fundas.</p>
         </div>
     </div>
     {% endfor %}
