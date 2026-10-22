@@ -8,8 +8,13 @@ El esquema (tablas, índices y versión) también se define aquí, para que
 app.py y download_cards.py usen exactamente la misma estructura.
 """
 
+import base64
+import json
 import os
 import sqlite3
+import threading
+import urllib.error
+import urllib.request
 from contextlib import contextmanager
 
 # Ruta ABSOLUTA a la base de datos, calculada a partir de la carpeta donde
@@ -17,6 +22,8 @@ from contextlib import contextmanager
 # desde otra carpeta.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "mtg_cards.db")
+BACKUP_JSON_PATH = os.path.join(BASE_DIR, "datos_persistentes.json")
+_RESTAURADO_EN_ARRANQUE = False
 
 # Versión del esquema. Se guarda en `PRAGMA user_version`.
 #   0 -> base de datos vacía o del esquema antiguo (clave = id de impresión)
@@ -161,6 +168,7 @@ def asegurar_esquema_usuarios(conn):
             conn.execute("ALTER TABLE mazos ADD COLUMN bracket_objetivo INTEGER DEFAULT 0")
         if "comandante_imagen_personalizada" not in columnas:
             conn.execute("ALTER TABLE mazos ADD COLUMN comandante_imagen_personalizada TEXT")
+        conn.execute("DELETE FROM mazos WHERE usuario_id IS NULL")
     if tabla_existe(conn, "mazo_cartas"):
         col_mc = [f[1] for f in conn.execute("PRAGMA table_info(mazo_cartas)").fetchall()]
         if "imagen_personalizada" not in col_mc:
@@ -176,6 +184,7 @@ def estado_bd():
       "vacia"   -> el esquema es correcto pero no hay cartas
       "ok"      -> todo listo
     """
+    global _RESTAURADO_EN_ARRANQUE
     if not os.path.exists(DB_PATH):
         return "falta"
     with conexion() as conn:
@@ -186,7 +195,209 @@ def estado_bd():
             return "antigua"
         asegurar_esquema_usuarios(conn)
         hay_cartas = conn.execute("SELECT 1 FROM cartas LIMIT 1").fetchone()
-        return "ok" if hay_cartas else "vacia"
+        estado = "ok" if hay_cartas else "vacia"
+    if estado == "ok" and not _RESTAURADO_EN_ARRANQUE:
+        _RESTAURADO_EN_ARRANQUE = True
+        try:
+            restaurar_estado_persistente()
+        except Exception:
+            pass
+    return estado
+
+
+def obtener_meta(clave, por_defecto=None):
+    if not os.path.exists(DB_PATH):
+        return por_defecto
+    try:
+        with conexion() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS meta (clave TEXT PRIMARY KEY, valor TEXT)")
+            fila = conn.execute("SELECT valor FROM meta WHERE clave = ?", (clave,)).fetchone()
+            return fila["valor"] if fila and fila["valor"] is not None else por_defecto
+    except Exception:
+        return por_defecto
+
+
+def guardar_meta(clave, valor):
+    if not os.path.exists(DB_PATH):
+        return
+    with conexion() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS meta (clave TEXT PRIMARY KEY, valor TEXT)")
+        conn.execute(
+            "INSERT INTO meta (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+            (clave, valor),
+        )
+        conn.commit()
+    guardar_estado_persistente()
+
+
+def _exportar_snapshot_dict():
+    with conexion() as conn:
+        usuarios = [dict(r) for r in conn.execute("SELECT * FROM usuarios ORDER BY id").fetchall()]
+        mazos = [dict(r) for r in conn.execute("SELECT * FROM mazos ORDER BY id").fetchall()]
+        mazo_cartas = [dict(r) for r in conn.execute("SELECT * FROM mazo_cartas ORDER BY id").fetchall()]
+        meta = {
+            r["clave"]: r["valor"]
+            for r in conn.execute("SELECT clave, valor FROM meta").fetchall()
+            if r["clave"] not in ("gh_sync_token",)
+        }
+    return {
+        "usuarios": usuarios,
+        "mazos": mazos,
+        "mazo_cartas": mazo_cartas,
+        "meta": meta,
+    }
+
+
+def _subir_snapshot_github_async(contenido_json):
+    token = os.environ.get("GITHUB_SYNC_TOKEN") or obtener_meta("gh_sync_token")
+    repo = os.environ.get("GITHUB_SYNC_REPO", "Jesus-Cantero/magic-pagina-")
+    if not token:
+        return
+    url = f"https://api.github.com/repos/{repo}/contents/datos_persistentes.json"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "SusoMTG-Persistence",
+    }
+    sha = None
+    try:
+        req_get = urllib.request.Request(f"{url}?ref=datos-persistentes", headers=headers)
+        with urllib.request.urlopen(req_get, timeout=8) as resp:
+            datos_actuales = json.loads(resp.read().decode("utf-8"))
+            sha = datos_actuales.get("sha")
+    except Exception:
+        pass
+
+    payload = {
+        "message": "Sincronizar cuentas y mazos [skip render]",
+        "content": base64.b64encode(contenido_json.encode("utf-8")).decode("ascii"),
+        "branch": "datos-persistentes",
+    }
+    if sha:
+        payload["sha"] = sha
+    try:
+        req_put = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="PUT",
+        )
+        urllib.request.urlopen(req_put, timeout=10).read()
+    except Exception:
+        pass
+
+
+def guardar_estado_persistente():
+    """
+    Guarda una copia ligera de `usuarios`, `mazos` y `mazo_cartas` en disco
+    (`datos_persistentes.json`) y la sincroniza en segundo plano con la rama
+    `datos-persistentes` para que en Render nunca se borren las cuentas ni los mazos.
+    """
+    try:
+        datos = _exportar_snapshot_dict()
+        texto = json.dumps(datos, ensure_ascii=False, indent=2)
+        with open(BACKUP_JSON_PATH, "w", encoding="utf-8") as f:
+            f.write(texto)
+        threading.Thread(target=_subir_snapshot_github_async, args=(texto,), daemon=True).start()
+    except Exception:
+        pass
+
+
+def restaurar_estado_persistente():
+    """
+    Restaura cuentas de usuario, mazos y cartas de mazos desde la rama `datos-persistentes`
+    o desde `datos_persistentes.json` local sin perder ningún dato existente.
+    """
+    datos = None
+    repo = os.environ.get("GITHUB_SYNC_REPO", "Jesus-Cantero/magic-pagina-")
+    url_raw = f"https://raw.githubusercontent.com/{repo}/datos-persistentes/datos_persistentes.json"
+    try:
+        req = urllib.request.Request(url_raw, headers={"User-Agent": "SusoMTG-Persistence", "Cache-Control": "no-cache"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            datos = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        pass
+
+    if not datos and os.path.exists(BACKUP_JSON_PATH):
+        try:
+            with open(BACKUP_JSON_PATH, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+        except Exception:
+            datos = None
+
+    if not isinstance(datos, dict):
+        return
+
+    with conexion() as conn:
+        for k, v in (datos.get("meta") or {}).items():
+            conn.execute(
+                "INSERT INTO meta (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = COALESCE(meta.valor, excluded.valor)",
+                (k, v),
+            )
+        for u in datos.get("usuarios") or []:
+            conn.execute(
+                """
+                INSERT INTO usuarios (id, nombre, email, password_hash, google_id, avatar_url, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(email) DO UPDATE SET
+                    nombre = COALESCE(excluded.nombre, usuarios.nombre),
+                    password_hash = COALESCE(excluded.password_hash, usuarios.password_hash),
+                    google_id = COALESCE(excluded.google_id, usuarios.google_id),
+                    avatar_url = COALESCE(excluded.avatar_url, usuarios.avatar_url)
+                """,
+                (
+                    u.get("id"),
+                    u.get("nombre") or "Planeswalker",
+                    (u.get("email") or "").strip().lower(),
+                    u.get("password_hash"),
+                    u.get("google_id"),
+                    u.get("avatar_url"),
+                    u.get("creado_en"),
+                ),
+            )
+        for m in datos.get("mazos") or []:
+            uid = m.get("usuario_id")
+            if not uid or not conn.execute("SELECT 1 FROM usuarios WHERE id = ?", (uid,)).fetchone():
+                continue
+            cmd_id = m.get("comandante_id")
+            if cmd_id and not conn.execute("SELECT 1 FROM cartas WHERE id = ?", (cmd_id,)).fetchone():
+                cmd_id = None
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO mazos (id, usuario_id, comandante_id, comandante_imagen_personalizada, nombre, formato, bracket_objetivo, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    m.get("id"),
+                    uid,
+                    cmd_id,
+                    m.get("comandante_imagen_personalizada"),
+                    m.get("nombre") or "Mazo",
+                    m.get("formato") or "Commander",
+                    int(m.get("bracket_objetivo") or 0),
+                    m.get("creado_en"),
+                ),
+            )
+        for mc in datos.get("mazo_cartas") or []:
+            if not conn.execute("SELECT 1 FROM mazos WHERE id = ?", (mc.get("mazo_id"),)).fetchone():
+                continue
+            if not conn.execute("SELECT 1 FROM cartas WHERE id = ?", (mc.get("carta_id"),)).fetchone():
+                continue
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO mazo_cartas (id, mazo_id, carta_id, cantidad, imagen_personalizada)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    mc.get("id"),
+                    mc.get("mazo_id"),
+                    mc.get("carta_id"),
+                    int(mc.get("cantidad") or 1),
+                    mc.get("imagen_personalizada"),
+                ),
+            )
+        conn.commit()
 
 
 # ---------- Cartas ----------
@@ -272,7 +483,25 @@ def crear_usuario(nombre, email, password_hash=None, google_id=None, avatar_url=
             (nombre.strip(), email_limpio, password_hash, google_id, avatar_url),
         )
         conn.commit()
-        return cur.lastrowid
+        uid = cur.lastrowid
+    guardar_estado_persistente()
+    return uid
+
+
+def actualizar_password_usuario(usuario_id, password_hash, nombre=None):
+    with conexion() as conn:
+        if nombre:
+            conn.execute(
+                "UPDATE usuarios SET password_hash = ?, nombre = ? WHERE id = ?",
+                (password_hash, nombre.strip(), usuario_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE usuarios SET password_hash = ? WHERE id = ?",
+                (password_hash, usuario_id),
+            )
+        conn.commit()
+    guardar_estado_persistente()
 
 
 def obtener_usuario_por_id(usuario_id):
@@ -311,23 +540,27 @@ def obtener_o_crear_usuario_google(google_id, email, nombre, avatar_url=None):
                 (google_id, avatar_url, nombre, usuario["id"]),
             )
             conn.commit()
-            return conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario["id"],)).fetchone()
-
-        cur = conn.execute(
-            """
-            INSERT INTO usuarios (nombre, email, google_id, avatar_url)
-            VALUES (?, ?, ?, ?)
-            """,
-            (nombre.strip() or email_limpio.split("@")[0], email_limpio, google_id, avatar_url),
-        )
-        conn.commit()
-        return conn.execute("SELECT * FROM usuarios WHERE id = ?", (cur.lastrowid,)).fetchone()
+            res = conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario["id"],)).fetchone()
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO usuarios (nombre, email, google_id, avatar_url)
+                VALUES (?, ?, ?, ?)
+                """,
+                (nombre.strip() or email_limpio.split("@")[0], email_limpio, google_id, avatar_url),
+            )
+            conn.commit()
+            res = conn.execute("SELECT * FROM usuarios WHERE id = ?", (cur.lastrowid,)).fetchone()
+    guardar_estado_persistente()
+    return res
 
 
 # ---------- Mazos ----------
 
 def crear_mazo(nombre, formato, usuario_id=None, comandante_id=None, bracket_objetivo=0):
     with conexion() as conn:
+        if usuario_id and not conn.execute("SELECT 1 FROM usuarios WHERE id = ?", (usuario_id,)).fetchone():
+            usuario_id = None
         if comandante_id and not conn.execute("SELECT 1 FROM cartas WHERE id = ?", (comandante_id,)).fetchone():
             comandante_id = None
         cur = conn.execute(
@@ -335,7 +568,9 @@ def crear_mazo(nombre, formato, usuario_id=None, comandante_id=None, bracket_obj
             (nombre, formato, usuario_id, comandante_id, int(bracket_objetivo or 0)),
         )
         conn.commit()
-        return cur.lastrowid
+        mid = cur.lastrowid
+    guardar_estado_persistente()
+    return mid
 
 
 def actualizar_bracket_mazo(mazo_id, bracket_objetivo):
@@ -344,6 +579,7 @@ def actualizar_bracket_mazo(mazo_id, bracket_objetivo):
     with conexion() as conn:
         conn.execute("UPDATE mazos SET bracket_objetivo = ? WHERE id = ?", (val, mazo_id))
         conn.commit()
+    guardar_estado_persistente()
 
 
 def asignar_comandante(mazo_id, carta_id=None, imagen_url=None):
@@ -360,6 +596,7 @@ def asignar_comandante(mazo_id, carta_id=None, imagen_url=None):
         if carta_id:
             conn.execute("DELETE FROM mazo_cartas WHERE mazo_id = ? AND carta_id = ?", (mazo_id, carta_id))
         conn.commit()
+    guardar_estado_persistente()
 
 
 def actualizar_formato_mazo(mazo_id, formato):
@@ -367,6 +604,7 @@ def actualizar_formato_mazo(mazo_id, formato):
     with conexion() as conn:
         conn.execute("UPDATE mazos SET formato = ? WHERE id = ?", (formato.strip(), mazo_id))
         conn.commit()
+    guardar_estado_persistente()
 
 
 def buscar_cartas_autocompletar(texto="", solo_comandantes=False, limite=12):
@@ -409,14 +647,12 @@ def listar_mazos(usuario_id=None):
         GROUP BY m.id
         ORDER BY m.creado_en DESC, m.id DESC
     """
+    if usuario_id is None:
+        return []
     with conexion() as conn:
-        if usuario_id is not None:
-            return conn.execute(
-                consulta_base.format(where="WHERE m.usuario_id = ? OR m.usuario_id IS NULL"),
-                (usuario_id,),
-            ).fetchall()
         return conn.execute(
-            consulta_base.format(where="WHERE m.usuario_id IS NULL")
+            consulta_base.format(where="WHERE m.usuario_id = ?"),
+            (usuario_id,),
         ).fetchall()
 
 
@@ -483,7 +719,9 @@ def anadir_carta_a_mazo(mazo_id, carta_id, cantidad=1, imagen_url=None):
                 imagen_personalizada = COALESCE(excluded.imagen_personalizada, mazo_cartas.imagen_personalizada)
         """, (mazo_id, carta_id, cantidad, imagen_url, MAX_COPIAS_POR_CARTA))
         conn.commit()
-        return cantidad_carta_en_mazo(conn, mazo_id, carta_id), total_cartas_mazo(conn, mazo_id)
+        res = (cantidad_carta_en_mazo(conn, mazo_id, carta_id), total_cartas_mazo(conn, mazo_id))
+    guardar_estado_persistente()
+    return res
 
 
 def actualizar_imagen_carta_en_mazo(mazo_id, carta_id, imagen_url, es_comandante=False):
@@ -500,6 +738,7 @@ def actualizar_imagen_carta_en_mazo(mazo_id, carta_id, imagen_url, es_comandante
                 (imagen_url, mazo_id, carta_id),
             )
         conn.commit()
+    guardar_estado_persistente()
 
 
 def restar_carta_de_mazo(mazo_id, carta_id, cantidad=1):
@@ -521,7 +760,9 @@ def restar_carta_de_mazo(mazo_id, carta_id, cantidad=1):
             )
             nueva = 0
         conn.commit()
-        return nueva, total_cartas_mazo(conn, mazo_id)
+        res = (nueva, total_cartas_mazo(conn, mazo_id))
+    guardar_estado_persistente()
+    return res
 
 
 def quitar_carta_de_mazo(mazo_id, carta_id):
@@ -529,7 +770,9 @@ def quitar_carta_de_mazo(mazo_id, carta_id):
     with conexion() as conn:
         conn.execute("DELETE FROM mazo_cartas WHERE mazo_id = ? AND carta_id = ?", (mazo_id, carta_id))
         conn.commit()
-        return total_cartas_mazo(conn, mazo_id)
+        res = total_cartas_mazo(conn, mazo_id)
+    guardar_estado_persistente()
+    return res
 
 
 def eliminar_mazo(mazo_id):
@@ -538,6 +781,7 @@ def eliminar_mazo(mazo_id):
     with conexion() as conn:
         conn.execute("DELETE FROM mazos WHERE id = ?", (mazo_id,))
         conn.commit()
+    guardar_estado_persistente()
 
 
 def resumen_portada_moxfield(limite_spoilers=8):

@@ -132,8 +132,13 @@
     </div>
     {% else %}
         <div class="estado-vacio">
-            <h3>Todavía no has creado ningún mazo</h3>
-            <p>Elige tu Comandante arriba y empieza a construir las 99 cartas de tu mazo.</p>
+            {% if usuario_actual %}
+                <h3>Todavía no has creado ningún mazo en tu cuenta</h3>
+                <p>Elige el nombre, el formato y tu Comandante arriba para empezar a construir.</p>
+            {% else %}
+                <h3>🔒 Inicia sesión para crear y guardar tus mazos</h3>
+                <p>Ningún mazo se guarda sin una cuenta activa. <a href="{{ url_for('login') }}"><strong>Inicia sesión</strong></a> o <a href="{{ url_for('registro') }}"><strong>crea una cuenta</strong></a> para construir y conservar tus mazos.</p>
+            {% endif %}
         </div>
     {% endfor %}
 </div>

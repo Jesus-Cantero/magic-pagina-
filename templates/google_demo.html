@@ -1,26 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Continuar con Google · SusoMTG{% endblock %}
+{% block title %}Inicia sesión con Google · SusoMTG{% endblock %}
 
 {% block content %}
 <div class="auth-wrapper">
     <div class="auth-card">
         <div class="auth-header">
-            <span class="eyebrow">Inicio de sesión rápido con Google</span>
-            <h1>Elige una cuenta de Google</h1>
-            <p>Para continuar a <strong>SusoMTG · Demonic Consultation</strong></p>
+            <span class="eyebrow">Google Accounts · OAuth 2.0</span>
+            <h1>Continuar con Google</h1>
+            <p>Inicia sesión o crea tu cuenta vinculada a Google en <strong>SusoMTG · Demonic Consultation</strong></p>
         </div>
 
         <form method="post" action="{{ url_for('auth_google_demo') }}" class="auth-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="campo-filtro">
-                <label for="google-nombre">Tu nombre en Google</label>
-                <input type="text" id="google-nombre" name="nombre" placeholder="Ej. Jesús / Suso" required maxlength="60">
+                <label for="google-email">Correo electrónico de Google (Gmail)</label>
+                <input type="email" id="google-email" name="email" placeholder="tucuenta@gmail.com" required>
             </div>
 
             <div class="campo-filtro">
-                <label for="google-email">Correo de Gmail / Google</label>
-                <input type="email" id="google-email" name="email" placeholder="tucuenta@gmail.com" required>
+                <label for="google-nombre">Nombre de tu perfil (opcional si ya tienes cuenta)</label>
+                <input type="text" id="google-nombre" name="nombre" placeholder="Ej. Jesús / Suso" maxlength="60">
+            </div>
+
+            <div class="campo-filtro">
+                <label for="google-password">Contraseña para tu cuenta (opcional, mín. 6 caracteres)</label>
+                <input type="password" id="google-password" name="password" placeholder="Para poder entrar también con correo y contraseña" minlength="6">
             </div>
 
             <button type="submit" class="btn-google btn-google-submit">
@@ -30,19 +35,30 @@
                     <path fill="#FBBC05" d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3-2.5c-.8.6-1.9 1-3.4 1-2.6 0-4.8-1.7-5.6-4.1l-3.2 2.5C4.9 19.8 8.2 22 12 22z"/>
                     <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.8H12v3.9h5.5c-.3 1.3-1.1 2.4-2.1 3.1l3 2.5c1.8-1.6 3.2-4.1 3.2-7.7z"/>
                 </svg>
-                <span>Entrar con esta cuenta de Google</span>
+                <span>Continuar con esta cuenta de Google</span>
             </button>
         </form>
 
-        <details class="google-info-box">
-            <summary>ℹ️ ¿Cómo conectar con Google Cloud OAuth real?</summary>
-            <p>
-                Ahora mismo estás en el <strong>selector rápido local</strong> porque no hay claves OAuth definidas.
-                Si publicas la web y quieres usar la pantalla oficial de Google Cloud, solo tienes que definir estas dos variables de entorno antes de ejecutar <code>app.py</code>:
+        <details class="google-info-box" style="margin-top: 1.25rem;">
+            <summary style="cursor: pointer; font-weight: 600;">🔗 Conectar redirección oficial a <code>accounts.google.com</code> (OAuth 2.0)</summary>
+            <p style="margin-top: 0.6rem; font-size: 0.88rem; line-height: 1.5;">
+                Para que Google te redirija a su pantalla oficial (<code>https://accounts.google.com</code>), Google exige crear un <strong>ID de cliente OAuth 2.0</strong> gratuito en
+                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console &rarr; Credenciales</a>
+                añadiendo esta URI de redirección autorizada:
             </p>
-            <pre><code>$env:GOOGLE_CLIENT_ID = "tu-client-id.apps.googleusercontent.com"
-$env:GOOGLE_CLIENT_SECRET = "tu-client-secret"</code></pre>
-            <p>URL de redirección autorizada: <code>http://127.0.0.1:5000/auth/google/callback</code></p>
+            <pre style="user-select: all; padding: 0.5rem; font-size: 0.8rem;"><code>{{ redirect_uri_actual }}</code></pre>
+            <form method="post" action="{{ url_for('auth_google_configurar') }}" class="auth-form" style="margin-top: 0.75rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="campo-filtro">
+                    <label for="cfg-cid">Google Client ID</label>
+                    <input type="text" id="cfg-cid" name="client_id" value="{{ client_id_actual or '' }}" placeholder="xxxx.apps.googleusercontent.com" required>
+                </div>
+                <div class="campo-filtro">
+                    <label for="cfg-csec">Google Client Secret</label>
+                    <input type="password" id="cfg-csec" name="client_secret" placeholder="GOCSPX-..." required>
+                </div>
+                <button type="submit" class="btn-primario" style="width: 100%;">Guardar y redirigir a Google Oficial</button>
+            </form>
         </details>
 
         <p class="auth-footer">

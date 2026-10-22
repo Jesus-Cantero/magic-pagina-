@@ -67,51 +67,59 @@
     </div>
 
     <div class="mox-decks-showcase">
-        {% for mazo in mazos[:4] %}
-        {% set reglas = obtener_reglas_formato(mazo['formato']) %}
-        {% set usa_cmd = reglas['usa_comandante'] %}
-        {% set meta_cartas = reglas['total_objetivo'] %}
-        {% set total_actual = (mazo['cartas_biblioteca'] + (1 if (usa_cmd and mazo['comandante_id']) else 0)) %}
-        {% set brk = mazo['bracket'] %}
-        <article class="mox-deck-banner-card">
-            <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="mox-deck-art-header"
-               {% if mazo['comandante_imagen'] %}style="background-image: url('{{ mazo['comandante_imagen'] }}');"{% endif %}>
-                <div class="mox-deck-art-overlay"></div>
-                <div class="mox-deck-top-badges">
-                    <span class="badge-formato">{{ mazo['formato'] or 'Commander' }}</span>
-                    <span class="badge-bracket badge-bracket-{{ brk.activo }}">
-                        ⚡ {{ brk.info_activo.etiqueta_corta }}
-                    </span>
+        {% if usuario_actual %}
+            {% for mazo in mazos[:4] %}
+            {% set reglas = obtener_reglas_formato(mazo['formato']) %}
+            {% set usa_cmd = reglas['usa_comandante'] %}
+            {% set meta_cartas = reglas['total_objetivo'] %}
+            {% set total_actual = (mazo['cartas_biblioteca'] + (1 if (usa_cmd and mazo['comandante_id']) else 0)) %}
+            {% set brk = mazo['bracket'] %}
+            <article class="mox-deck-banner-card">
+                <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="mox-deck-art-header"
+                   {% if mazo['comandante_imagen'] %}style="background-image: url('{{ mazo['comandante_imagen'] }}');"{% endif %}>
+                    <div class="mox-deck-art-overlay"></div>
+                    <div class="mox-deck-top-badges">
+                        <span class="badge-formato">{{ mazo['formato'] or 'Commander' }}</span>
+                        <span class="badge-bracket badge-bracket-{{ brk.activo }}">
+                            ⚡ {{ brk.info_activo.etiqueta_corta }}
+                        </span>
+                    </div>
+                    <div class="mox-deck-bottom-title">
+                        <h3>{{ mazo['nombre'] }}</h3>
+                        {% if mazo['comandante_nombre'] %}
+                            <span class="mox-deck-cmd-line">👑 {{ mazo['comandante_nombre'] }}</span>
+                        {% else %}
+                            <span class="mox-deck-cmd-line">⚔️ Modo {{ reglas['id'] }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+                <div class="mox-deck-banner-body">
+                    <div class="mox-deck-stats-row">
+                        <span>📚 <strong>{{ total_actual }} / {{ meta_cartas }}</strong> cartas</span>
+                        <span>🔥 <strong>{{ brk.game_changers|length }}</strong> Game Changers</span>
+                        <span>🔍 <strong>{{ brk.tutores|length }}</strong> Tutores</span>
+                    </div>
+                    <div class="mox-deck-banner-actions">
+                        <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="btn btn-sm">Abrir Constructor</a>
+                        <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">∞ Combos</a>
+                    </div>
                 </div>
-                <div class="mox-deck-bottom-title">
-                    <h3>{{ mazo['nombre'] }}</h3>
-                    {% if mazo['comandante_nombre'] %}
-                        <span class="mox-deck-cmd-line">👑 {{ mazo['comandante_nombre'] }}</span>
-                    {% else %}
-                        <span class="mox-deck-cmd-line">⚔️ Modo {{ reglas['id'] }}</span>
-                    {% endif %}
-                </div>
-            </a>
-            <div class="mox-deck-banner-body">
-                <div class="mox-deck-stats-row">
-                    <span>📚 <strong>{{ total_actual }} / {{ meta_cartas }}</strong> cartas</span>
-                    <span>🔥 <strong>{{ brk.game_changers|length }}</strong> Game Changers</span>
-                    <span>🔍 <strong>{{ brk.tutores|length }}</strong> Tutores</span>
-                </div>
-                <div class="mox-deck-banner-actions">
-                    <a href="{{ url_for('ver_mazo', mazo_id=mazo['id']) }}" class="btn btn-sm">Abrir Constructor</a>
-                    <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">∞ Combos</a>
-                </div>
-            </div>
-        </article>
-        {% endfor %}
+            </article>
+            {% endfor %}
 
-        <!-- Tarjeta rápida para crear un nuevo mazo -->
-        <a href="{{ url_for('listar_mazos') }}" class="mox-deck-create-tile">
-            <span class="create-plus">+</span>
-            <h3>Crear un nuevo mazo</h3>
-            <p>Elige entre Commander, cEDH, Pauper, Legacy, Modern, Standard, Brawl o cualquiera de los 26 formatos.</p>
-        </a>
+            <!-- Tarjeta rápida para crear un nuevo mazo -->
+            <a href="{{ url_for('listar_mazos') }}" class="mox-deck-create-tile">
+                <span class="create-plus">+</span>
+                <h3>Crear un nuevo mazo</h3>
+                <p>Elige entre Commander, cEDH, Pauper, Legacy, Modern, Standard, Brawl o cualquiera de los 26 formatos.</p>
+            </a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="mox-deck-create-tile">
+                <span class="create-plus">🔒</span>
+                <h3>Inicia sesión para crear y guardar tus mazos</h3>
+                <p>Los mazos se guardan exclusivamente dentro de tu cuenta personal. Entra o regístrate para construir tu colección.</p>
+            </a>
+        {% endif %}
     </div>
 </section>
 

@@ -24,6 +24,7 @@ import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from markupsafe import Markup, escape
@@ -33,9 +34,14 @@ import database as db
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
-# La clave secreta ya NO está escrita en el código: se lee de una variable de entorno.
-app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+# Clave secreta persistente para que las sesiones no se borren al reiniciar ni entre workers de Gunicorn.
+app.secret_key = (
+    os.environ.get("SECRET_KEY")
+    or db.obtener_meta("secret_key")
+    or "suso-mtg-moxfield-secret-key-2026-permanent-9f8e7d6c5b4a"
+)
 
 POR_PAGINA = 24
 
@@ -854,7 +860,8 @@ def home():
         )
 
     resumen = db.resumen_portada_moxfield(limite_spoilers=8)
-    filas_mazos = db.listar_mazos(session.get("usuario_id"))
+    usuario = obtener_usuario_actual()
+    filas_mazos = db.listar_mazos(usuario["id"] if usuario else None)
     mazos = []
     for fila in filas_mazos:
         d = dict(fila)
@@ -904,7 +911,8 @@ def index():
         return redirect(url_for("index", q=texto, tipo=tipo, color=color,
                                 orden=orden, spoilers="1" if solo_spoilers else None, pagina=total_paginas))
 
-    mazos = db.listar_mazos(session.get("usuario_id"))
+    usuario = obtener_usuario_actual()
+    mazos = db.listar_mazos(usuario["id"] if usuario else None)
     return render_template(
         "index.html",
         cartas=cartas,
@@ -927,7 +935,8 @@ def carta_detalle(carta_id):
     if carta is None:
         flash("No se encontró esa carta.")
         return redirect(url_for("index"))
-    mazos = db.listar_mazos(session.get("usuario_id"))
+    usuario = obtener_usuario_actual()
+    mazos = db.listar_mazos(usuario["id"] if usuario else None)
     legalidades = parsear_legalidades(carta["legalidades"])
     return render_template("card_detail.html", carta=carta, mazos=mazos, legalidades=legalidades)
 
@@ -935,7 +944,8 @@ def carta_detalle(carta_id):
 @app.route("/mazos")
 def listar_mazos():
     formato_pre = request.args.get("formato", "").strip()
-    filas_mazos = db.listar_mazos(session.get("usuario_id"))
+    usuario = obtener_usuario_actual()
+    filas_mazos = db.listar_mazos(usuario["id"] if usuario else None)
     mazos = []
     for fila in filas_mazos:
         d = dict(fila)
@@ -1046,6 +1056,11 @@ def calcular_analiticas_mazo(comandante, cartas_biblioteca):
 
 @app.route("/mazos/nuevo", methods=["POST"])
 def crear_mazo():
+    usuario = obtener_usuario_actual()
+    if not usuario:
+        flash("Debes iniciar sesión con tu cuenta para crear y guardar mazos.")
+        return redirect(url_for("login"))
+
     nombre = request.form.get("nombre", "").strip()
     formato = request.form.get("formato", "").strip() or "Commander"
     comandante_id = request.form.get("comandante_id", "").strip() or None
@@ -1060,16 +1075,20 @@ def crear_mazo():
         flash(f"El nombre admite como máximo {db.MAX_LONGITUD_NOMBRE_MAZO} caracteres "
               f"y el formato {db.MAX_LONGITUD_FORMATO}.")
         return redirect(url_for("listar_mazos"))
-    mazo_id = db.crear_mazo(nombre, reglas["id"], session.get("usuario_id"), comandante_id, bracket_objetivo)
-    flash(f"Mazo «{nombre}» ({reglas['id']}) creado.")
+    mazo_id = db.crear_mazo(nombre, reglas["id"], usuario["id"], comandante_id, bracket_objetivo)
+    flash(f"Mazo «{nombre}» ({reglas['id']}) guardado en tu cuenta.")
     return redirect(url_for("ver_mazo", mazo_id=mazo_id))
 
 
 @app.route("/mazos/<int:mazo_id>")
 def ver_mazo(mazo_id):
+    usuario = obtener_usuario_actual()
+    if not usuario:
+        flash("Inicia sesión con tu cuenta para ver y editar tus mazos.")
+        return redirect(url_for("login"))
     mazo, comandante, cartas_filas = db.obtener_mazo(mazo_id)
-    if mazo is None:
-        flash("No se encontró ese mazo.")
+    if mazo is None or mazo["usuario_id"] != usuario["id"]:
+        flash("No se encontró ese mazo en tu cuenta.")
         return redirect(url_for("listar_mazos"))
 
     reglas_formato = obtener_reglas_formato(mazo["formato"])
@@ -1133,8 +1152,13 @@ def ver_mazo(mazo_id):
 
 @app.route("/mazos/<int:mazo_id>/eliminar", methods=["POST"])
 def eliminar_mazo(mazo_id):
-    if db.obtener_mazo_simple(mazo_id) is None:
-        flash("No se encontró ese mazo.")
+    usuario = obtener_usuario_actual()
+    if not usuario:
+        flash("Inicia sesión con tu cuenta para gestionar tus mazos.")
+        return redirect(url_for("login"))
+    mazo = db.obtener_mazo_simple(mazo_id)
+    if mazo is None or mazo["usuario_id"] != usuario["id"]:
+        flash("No se encontró ese mazo en tu cuenta.")
     else:
         db.eliminar_mazo(mazo_id)
         flash("Mazo eliminado.")
@@ -1144,6 +1168,19 @@ def eliminar_mazo(mazo_id):
 # ---------- Autenticación: Registro, Login, Cuenta y Google OAuth ----------
 
 PATRON_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _credenciales_google():
+    cid = (os.environ.get("GOOGLE_CLIENT_ID") or db.obtener_meta("google_client_id") or "").strip()
+    csec = (os.environ.get("GOOGLE_CLIENT_SECRET") or db.obtener_meta("google_client_secret") or "").strip()
+    return cid, csec
+
+
+def _redirect_uri_google():
+    uri = url_for("auth_google_callback", _external=True)
+    if request.headers.get("X-Forwarded-Proto", "").lower() == "https" or ".onrender.com" in request.host or ".trycloudflare.com" in request.host:
+        uri = re.sub(r"^http://", "https://", uri)
+    return uri
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1156,13 +1193,19 @@ def login():
         password = request.form.get("password", "")
         usuario = db.obtener_usuario_por_email(email)
 
+        if usuario is not None and not usuario["password_hash"] and len(password) >= 6:
+            # Cuenta creada previamente con Google sin contraseña: le asignamos esta contraseña
+            db.actualizar_password_usuario(usuario["id"], generate_password_hash(password))
+            usuario = db.obtener_usuario_por_email(email)
+
         if usuario is None or not usuario["password_hash"] or not check_password_hash(usuario["password_hash"], password):
             flash("Correo electrónico o contraseña incorrectos.")
             return render_template("login.html", email=email), 401
 
+        session.permanent = True
         session["usuario_id"] = usuario["id"]
         flash(f"¡Bienvenido de nuevo, {usuario['nombre']}!")
-        return redirect(url_for("index"))
+        return redirect(url_for("home"))
 
     return render_template("login.html", email="")
 
@@ -1190,14 +1233,23 @@ def registro():
         if password != confirmar:
             flash("Las contraseñas no coinciden.")
             return render_template("register.html", nombre=nombre, email=email), 400
-        if db.obtener_usuario_por_email(email) is not None:
+
+        existente = db.obtener_usuario_por_email(email)
+        if existente is not None:
+            if not existente["password_hash"]:
+                db.actualizar_password_usuario(existente["id"], generate_password_hash(password), nombre=nombre)
+                session.permanent = True
+                session["usuario_id"] = existente["id"]
+                flash(f"¡Contraseña configurada y sesión iniciada como {nombre}!")
+                return redirect(url_for("home"))
             flash("Ya existe una cuenta con ese correo electrónico. Inicia sesión.")
             return render_template("register.html", nombre=nombre, email=email), 409
 
         uid = db.crear_usuario(nombre, email, password_hash=generate_password_hash(password))
+        session.permanent = True
         session["usuario_id"] = uid
         flash(f"¡Cuenta creada con éxito! Bienvenido, {nombre}.")
-        return redirect(url_for("index"))
+        return redirect(url_for("home"))
 
     return render_template("register.html", nombre="", email="")
 
@@ -1206,7 +1258,7 @@ def registro():
 def logout():
     session.pop("usuario_id", None)
     flash("Has cerrado sesión correctamente.")
-    return redirect(url_for("index"))
+    return redirect(url_for("home"))
 
 
 @app.route("/cuenta")
@@ -1222,18 +1274,18 @@ def cuenta():
 @app.route("/auth/google")
 def auth_google():
     """
-    Inicia el flujo OAuth 2.0 con Google si GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET
-    están definidos en el entorno. Si no están configurados, abre el selector
-    interactivo de Google en modo desarrollo local para poder probar el login al instante.
+    Inicia el flujo OAuth 2.0 real redirigiendo a https://accounts.google.com
+    cuando GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET están configurados (por variables
+    de entorno o guardados en la base de datos).
     """
-    client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    client_id, client_secret = _credenciales_google()
     if not client_id or not client_secret:
         return redirect(url_for("auth_google_demo"))
 
     estado_oauth = secrets.token_urlsafe(24)
+    session.permanent = True
     session["google_oauth_state"] = estado_oauth
-    redirect_uri = url_for("auth_google_callback", _external=True)
+    redirect_uri = _redirect_uri_google()
 
     params = urllib.parse.urlencode({
         "client_id": client_id,
@@ -1252,13 +1304,12 @@ def auth_google_callback():
     estado_recibido = request.args.get("state", "")
     codigo = request.args.get("code", "")
 
-    if not estado_esperado or not secrets.compare_digest(estado_esperado, estado_recibido) or not codigo:
+    if not codigo or (estado_esperado and not secrets.compare_digest(estado_esperado, estado_recibido)):
         flash("No se pudo verificar la respuesta de Google. Inténtalo de nuevo.")
         return redirect(url_for("login"))
 
-    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-    redirect_uri = url_for("auth_google_callback", _external=True)
+    client_id, client_secret = _credenciales_google()
+    redirect_uri = _redirect_uri_google()
 
     try:
         datos_token = urllib.parse.urlencode({
@@ -1285,8 +1336,8 @@ def auth_google_callback():
         with urllib.request.urlopen(req_perfil, timeout=15) as resp:
             perfil = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
-        flash("Error al comunicarse con Google OAuth.")
-        return redirect(url_for("login"))
+        flash("Error al comunicarse con Google OAuth. Revisa el Client ID, Client Secret y la Redirect URI en Google Cloud.")
+        return redirect(url_for("auth_google_demo"))
 
     google_id = perfil.get("sub")
     email = perfil.get("email")
@@ -1298,32 +1349,54 @@ def auth_google_callback():
         return redirect(url_for("login"))
 
     usuario = db.obtener_o_crear_usuario_google(google_id, email, nombre, avatar)
+    session.permanent = True
     session["usuario_id"] = usuario["id"]
-    flash(f"Sesión iniciada con Google como {usuario['nombre']}.")
-    return redirect(url_for("index"))
+    flash(f"¡Sesión iniciada con Google como {usuario['nombre']} ({usuario['email']})!")
+    return redirect(url_for("home"))
+
+
+@app.route("/auth/google/configurar", methods=["POST"])
+def auth_google_configurar():
+    """Guarda GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en la BD y lanza el redirect real a Google."""
+    cid = request.form.get("client_id", "").strip()
+    csec = request.form.get("client_secret", "").strip()
+    if not cid or not csec:
+        flash("Debes introducir tanto el Client ID como el Client Secret de Google Cloud.")
+        return redirect(url_for("auth_google_demo"))
+    db.guardar_meta("google_client_id", cid)
+    db.guardar_meta("google_client_secret", csec)
+    flash("Credenciales de Google OAuth guardadas. Redirigiendo a Google...")
+    return redirect(url_for("auth_google"))
 
 
 @app.route("/auth/google/demo", methods=["GET", "POST"])
 def auth_google_demo():
     """
-    Selector interactivo de cuenta de Google para desarrollo local cuando
-    no se han configurado aún GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET.
+    Selector de cuenta de Google y asistente para activar la redirección real
+    a accounts.google.com con un clic.
     """
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         nombre = request.form.get("nombre", "").strip()
+        password = request.form.get("password", "")
         if not PATRON_EMAIL.match(email):
-            flash("Introduce un correo válido para continuar con Google.")
+            flash("Introduce un correo de Google válido.")
             return redirect(url_for("auth_google_demo"))
+        exist = db.obtener_usuario_por_email(email)
         if not nombre:
-            nombre = email.split("@")[0].capitalize()
+            nombre = exist["nombre"] if exist else email.split("@")[0].capitalize()
         google_id = f"google-local-{email}"
         usuario = db.obtener_o_crear_usuario_google(google_id, email, nombre)
+        if password and len(password) >= 6:
+            db.actualizar_password_usuario(usuario["id"], generate_password_hash(password), nombre=nombre)
+        session.permanent = True
         session["usuario_id"] = usuario["id"]
-        flash(f"Has iniciado sesión con Google como {usuario['nombre']} ({usuario['email']}).")
-        return redirect(url_for("index"))
+        flash(f"¡Sesión iniciada con Google como {usuario['nombre']} ({usuario['email']})!")
+        return redirect(url_for("home"))
 
-    return render_template("google_demo.html")
+    redirect_uri_actual = _redirect_uri_google()
+    cid_actual, _ = _credenciales_google()
+    return render_template("google_demo.html", redirect_uri_actual=redirect_uri_actual, client_id_actual=cid_actual)
 
 
 # ---------- Endpoints usados por JavaScript (AJAX) ----------
