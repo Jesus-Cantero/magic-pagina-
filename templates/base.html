@@ -6,7 +6,7 @@
     <!-- Token CSRF: lo lee static/js/api.js para enviarlo en las peticiones fetch() -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Suso · MTG Deckbuilder & Card Search{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261022e">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261022f">
 </head>
 <body>
     <!-- Filtro SVG de Super-Resolución y Nitidez 4K Ultra-HD para las cartas -->
@@ -96,9 +96,37 @@
 
     <footer class="pie">
         <div class="pie-inner">
-            <span><strong>SusoMTG</strong> · Demonic Consultation</span>
-            <span>Datos e imágenes <strong>4K Ultra HD (PNG Master)</strong> de <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a> · Magic: The Gathering es propiedad de Wizards of the Coast.</span>
+            <span><strong>SusoMTG</strong> · Demonic Consultation · Proyecto Personal &amp; Fan Page</span>
+            <span>Datos e imágenes <strong>4K Ultra HD (PNG Master)</strong> servidos por <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a> · <em>Magic: The Gathering</em> es propiedad de <a href="https://company.wizards.com" target="_blank" rel="noopener">Wizards of the Coast LLC</a>.</span>
         </div>
+
+        <!-- APARTADO DE AVISO LEGAL, COPYRIGHT, PÁGINAS DE INSPIRACIÓN Y CONTACTO -->
+        <section class="pie-legal-wrap" aria-label="Aviso legal, derechos de autor y contacto">
+            <div class="pie-legal-box">
+                <div class="pie-legal-header">
+                    <span class="pie-legal-badge">⚖️ Aviso Legal · Fan Content · Uso 100% No Lucrativo</span>
+                    <a href="mailto:suso562012@gmail.com" class="pie-legal-mail-pill">
+                        ✉️ Contacto directo: <strong>suso562012@gmail.com</strong>
+                    </a>
+                </div>
+
+                <p class="pie-legal-p">
+                    <strong>Página Fan sin ánimo de lucro (Proyecto Personal):</strong>
+                    Esta web es una <strong>página fan no oficial</strong> desarrollada <strong>única y exclusivamente como proyecto personal y académico</strong>, <strong>sin ningún ánimo lucrativo</strong> ni actividad comercial de ningún tipo. Se reitera expresamente que su uso es estrictamente <strong>no lucrativo y solo como proyecto personal</strong>.
+                </p>
+
+                <p class="pie-legal-p">
+                    <strong>Derechos reservados (Wizards of the Coast, Scryfall y páginas de inspiración):</strong>
+                    Todos los derechos de propiedad intelectual, nombres de cartas, ilustraciones, símbolos de maná, expansiones y marcas de <em>Magic: The Gathering</em> son propiedad exclusiva de <strong>Wizards of the Coast LLC</strong> (utilizados bajo la política de contenido de fans <em>Wizards of the Coast Fan Content Policy</em>). Los datos del catálogo e imágenes provienen de <strong>Scryfall LLC</strong>, con todos sus derechos reservados. Asimismo, se reconocen y respetan todos los derechos de autor, diseño e identidad visual de las plataformas comunitarias que han servido como páginas de inspiración para este proyecto personal (<a href="https://moxfield.com" target="_blank" rel="noopener">Moxfield</a>, <a href="https://commanderspellbook.com" target="_blank" rel="noopener">Commander Spellbook</a> y herramientas de visualización de combos y álbumes de coleccionismo), las cuales pertenecen íntegramente a sus respectivos titulares y no guardan afiliación oficial con esta web.
+                </p>
+
+                <p class="pie-legal-p pie-legal-contacto">
+                    <strong>Retirada inmediata de contenido ante cualquier molestia:</strong>
+                    Si eres titular de algún derecho o representante de cualquiera de las entidades o páginas mencionadas y algún elemento de este proyecto personal te ocasiona cualquier molestia, por favor escríbenos directamente a
+                    <a href="mailto:suso562012@gmail.com"><strong>suso562012@gmail.com</strong></a> y <strong>se retirará o modificará el contenido de forma inmediata y sin ningún problema</strong>.
+                </p>
+            </div>
+        </section>
     </footer>
 
     <!-- Modal global de Alters Oficiales y Selección de Arte en Calidad 4K Ultra HD -->

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{{ mazo['nombre'] }} · Constructor Moxfield · SusoMTG{% endblock %}
+{% block title %}{{ mazo['nombre'] }} · Constructor de Mazos · SusoMTG{% endblock %}
 
 {% block content %}
 <div class="barra-superior-detalle">
     <a href="{{ url_for('listar_mazos') }}" class="btn btn-secundario btn-sm">&larr; Volver a mis mazos</a>
     <div class="acciones-busqueda">
         <button type="button" class="btn btn-secundario btn-sm active" id="btn-vista-visual">🃏 Vista Visual</button>
-        <button type="button" class="btn btn-secundario btn-sm" id="btn-vista-lista">☰ Vista Lista Moxfield</button>
+        <button type="button" class="btn btn-secundario btn-sm" id="btn-vista-lista">☰ Vista Lista Compacta</button>
         <a href="{{ url_for('combos', mazo_id=mazo['id']) }}" class="btn btn-secundario btn-sm">∞ Analizar combos</a>
         <a href="{{ url_for('index') }}" class="btn btn-sm">+ Explorar catálogo</a>
     </div>
@@ -201,7 +201,7 @@
         <section class="panel-bracket-moxfield">
             <div class="panel-comandante-header">
                 <div class="bracket-header-top">
-                    <span class="eyebrow">Sistema Oficial WotC / Moxfield</span>
+                    <span class="eyebrow">Sistema de Brackets 1–5</span>
                     <select id="select-cambiar-bracket" class="select-bracket-mini" title="Elegir Bracket objetivo o dejar en automático">
                         <option value="0" {% if bracket.objetivo == 0 %}selected{% endif %}>⚡ Auto (Est. B{{ bracket.estimado }})</option>
                         {% for b in bracket.catalogo %}

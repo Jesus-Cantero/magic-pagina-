@@ -4524,5 +4524,97 @@ html, body {
     image-rendering: high-quality;
 }
 
+/* =====================================================
+   APARTADO DE AVISO LEGAL, COPYRIGHT Y PROYECTO PERSONAL SIN ÁNIMO DE LUCRO
+   ===================================================== */
+
+.pie-legal-wrap {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 0 1.75rem 1.85rem;
+}
+
+.pie-legal-box {
+    background: rgba(11, 13, 18, 0.72);
+    border: 1px solid var(--line-light);
+    border-radius: 12px;
+    padding: 1.15rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.pie-legal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.pie-legal-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: var(--accent-light);
+    background: rgba(124, 92, 255, 0.14);
+    border: 1px solid rgba(124, 92, 255, 0.35);
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+}
+
+.pie-legal-mail-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-light);
+    color: #ffffff;
+    font-size: 0.8rem;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.pie-legal-mail-pill:hover {
+    border-color: var(--accent);
+    background: var(--panel-hover);
+    color: #ffffff;
+}
+
+.pie-legal-p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.58;
+    color: var(--muted);
+}
+
+.pie-legal-p strong {
+    color: var(--parchment);
+}
+
+.pie-legal-contacto {
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--line);
+}
+
+@media (max-width: 768px) {
+    .pie-legal-wrap {
+        padding: 0 0.85rem 1.5rem;
+    }
+    .pie-legal-box {
+        padding: 0.95rem 1rem;
+    }
+    .pie-legal-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+
 
 
